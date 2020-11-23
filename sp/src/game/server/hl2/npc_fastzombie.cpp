@@ -477,6 +477,11 @@ int CFastZombie::SelectSchedule ( void )
 
 	switch ( m_NPCState )
 	{
+	case NPC_STATE_IDLE:
+		{
+			return SCHED_PATROL_WALK_LOOP;
+		}
+		break;
 	case NPC_STATE_COMBAT:
 		if ( HasCondition( COND_LOST_ENEMY ) || ( HasCondition( COND_ENEMY_UNREACHABLE ) && MustCloseToAttack() ) )
 		{
@@ -499,7 +504,8 @@ int CFastZombie::SelectSchedule ( void )
 
 			// Just lost track of our enemy. 
 			// Wander around a bit so we don't look like a dingus.
-			return SCHED_ZOMBIE_WANDER_MEDIUM;
+			//return SCHED_ZOMBIE_WANDER_MEDIUM;
+			return SCHED_PATROL_WALK_LOOP;
 		}
 		break;
 	}
@@ -806,7 +812,7 @@ const char *CFastZombie::GetLegsModel( void )
 
 const char *CFastZombie::GetTorsoModel( void )
 {
-	return "models/gibs/fast_zombie_torso.mdl";
+	return "models/zombie/Fast_torso.mdl";
 }
 
 
@@ -914,6 +920,9 @@ void CFastZombie::IdleSound( void )
 //-----------------------------------------------------------------------------
 void CFastZombie::PainSound( const CTakeDamageInfo &info )
 {
+	if (IsOnFire())
+		return;
+
 	if ( m_pLayer2 )
 		ENVELOPE_CONTROLLER.SoundPlayEnvelope( m_pLayer2, SOUNDCTRL_CHANGE_VOLUME, envFastZombieVolumePain, ARRAYSIZE(envFastZombieVolumePain) );
 	if ( m_pMoanSound )
@@ -924,6 +933,9 @@ void CFastZombie::PainSound( const CTakeDamageInfo &info )
 //-----------------------------------------------------------------------------
 void CFastZombie::DeathSound( const CTakeDamageInfo &info ) 
 {
+	if (IsOnFire())
+		return;
+
 	EmitSound( "NPC_FastZombie.Die" );
 }
 
@@ -932,7 +944,7 @@ void CFastZombie::DeathSound( const CTakeDamageInfo &info )
 //-----------------------------------------------------------------------------
 void CFastZombie::AlertSound( void )
 {
-	CBaseEntity *pPlayer = AI_GetSinglePlayer();
+	CBaseEntity *pPlayer = UTIL_GetNearestPlayer(GetAbsOrigin());
 
 	if( pPlayer )
 	{

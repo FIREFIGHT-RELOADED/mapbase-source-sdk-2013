@@ -1342,7 +1342,7 @@ void CBaseHeadcrab::DropFromCeiling( void )
 				{
 					SetSchedule( SCHED_HEADCRAB_CEILING_DROP );
 
-					CBaseEntity *pPlayer = AI_GetSinglePlayer();
+					CBaseEntity *pPlayer = UTIL_GetNearestPlayer(GetAbsOrigin());
 
 					if ( pPlayer )
 					{
@@ -1949,6 +1949,11 @@ int CBaseHeadcrab::SelectSchedule( void )
 
 	switch ( m_NPCState )
 	{
+		case NPC_STATE_IDLE:
+		{
+			return SCHED_PATROL_WALK_LOOP;
+			break;
+		}
 		case NPC_STATE_ALERT:
 		{
 			if (HasCondition( COND_LIGHT_DAMAGE ) || HasCondition( COND_HEAVY_DAMAGE ))
@@ -1972,7 +1977,7 @@ int CBaseHeadcrab::SelectSchedule( void )
 			}
 			else
 			{
-				return SCHED_PATROL_WALK;
+				return SCHED_PATROL_WALK_LOOP;
 			}
 			break;
 		}
@@ -2142,9 +2147,7 @@ bool CBaseHeadcrab::HandleInteraction(int interactionType, void *data, CBaseComb
 		pEntity->m_NPCState = NPC_STATE_DEAD;
 		return true;
 	}
-	else if (	interactionType ==	g_interactionVortigauntKick
-				/* || (interactionType ==	g_interactionBullsquidThrow) */
-				)
+	else if (interactionType == g_interactionVortigauntKick) //|| interactionType == g_interactionBullsquidThrow)
 	{
 		SetIdealState( NPC_STATE_PRONE );
 		
@@ -2519,6 +2522,9 @@ void CHeadcrab::PainSound( const CTakeDamageInfo &info )
 //-----------------------------------------------------------------------------
 void CHeadcrab::DeathSound( const CTakeDamageInfo &info )
 {
+	if (IsOnFire())
+		return;
+
 	EmitSound( "NPC_HeadCrab.Die" );
 }
 
@@ -2635,6 +2641,9 @@ void CFastHeadcrab::PainSound( const CTakeDamageInfo &info )
 //-----------------------------------------------------------------------------
 void CFastHeadcrab::DeathSound( const CTakeDamageInfo &info )
 {
+	if (IsOnFire())
+		return;
+
 	EmitSound( "NPC_FastHeadcrab.Die" );
 }
 
@@ -3574,6 +3583,9 @@ void CBlackHeadcrab::PainSound( const CTakeDamageInfo &info )
 //-----------------------------------------------------------------------------
 void CBlackHeadcrab::DeathSound( const CTakeDamageInfo &info )
 {
+	if (IsOnFire())
+		return;
+
 	EmitSound( "NPC_BlackHeadcrab.Die" );
 }
 
