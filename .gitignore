@@ -71,3 +71,4 @@ config.cfg
 *.db
 *.db-shm
 *.db-wal
+mapbase_release_build_v5_1.zip
