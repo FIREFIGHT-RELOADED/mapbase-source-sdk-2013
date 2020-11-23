@@ -1,5 +1,4 @@
 # Files to ignore when considering what GIT should commit.
-mapbase_release_build_v5_1.zip
 
 # Visual Studio 
 *.suo
