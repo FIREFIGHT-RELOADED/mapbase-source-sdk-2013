@@ -68,6 +68,9 @@
 
 static ConVar cl_SetupAllBones( "cl_SetupAllBones", "0" );
 ConVar r_sequence_debug( "r_sequence_debug", "" );
+static ConVar cl_muzzleflash_dlight("cl_muzzleflash_dlight", "1", FCVAR_ARCHIVE);
+static ConVar cl_npc_ragdoll_fade("cl_npc_ragdoll_fade", "1", FCVAR_ARCHIVE);
+static ConVar cl_npc_ragdoll_fade_delay("cl_npc_ragdoll_fade_delay", "60.0", FCVAR_ARCHIVE);
 
 // If an NPC is moving faster than this, he should play the running footstep sound
 const float RUN_SPEED_ESTIMATE_SQR = 150.0f * 150.0f;
@@ -315,6 +318,11 @@ C_ClientRagdoll::C_ClientRagdoll( bool bRestoring )
 	m_bFadingOut = false;
 	m_bImportant = false;
 	m_bNoModelParticles = false;
+
+	if (cl_npc_ragdoll_fade.GetBool())
+	{
+		m_flFadeOutDelay = gpGlobals->curtime + cl_npc_ragdoll_fade_delay.GetFloat();
+	}
 
 	SetClassname("client_ragdoll");
 
@@ -600,6 +608,12 @@ void C_ClientRagdoll::ClientThink( void )
 	}
 
 	HandleAnimatedFriction();
+
+
+	if (cl_npc_ragdoll_fade.GetBool() && gpGlobals->curtime >= m_flFadeOutDelay)
+	{
+		SUB_Remove();
+	}
 
 	FadeOut();
 }
@@ -3369,20 +3383,86 @@ void C_BaseAnimating::ProcessMuzzleFlashEvent()
 		//FIXME: We should really use a named attachment for this
 		if ( m_Attachments.Count() > 0 )
 		{
-			Vector vAttachment;
-			QAngle dummyAngles;
-			GetAttachment( 1, vAttachment, dummyAngles );
+			if (cl_muzzleflash_dlight.GetInt() == 1)
+			{
+				Vector vAttachment, vAng;
+				QAngle angles;
+#ifdef HL2_EPISODIC
+				GetAttachment(1, vAttachment, angles); // set 1 instead "attachment"
+#else
+				GetAttachment(attachment, vAttachment, angles);
+#endif
+				AngleVectors(angles, &vAng);
+				vAttachment += vAng * 2;
 
-			// Make an elight
-			dlight_t *el = effects->CL_AllocElight( LIGHT_INDEX_MUZZLEFLASH + index );
-			el->origin = vAttachment;
-			el->radius = random->RandomInt( 32, 64 ); 
-			el->decay = el->radius / 0.05f;
-			el->die = gpGlobals->curtime + 0.05f;
-			el->color.r = 255;
-			el->color.g = 192;
-			el->color.b = 64;
-			el->color.exponent = 5;
+				dlight_t *dl = effects->CL_AllocDlight(index);
+				dl->origin = vAttachment;
+				dl->color.r = 231;
+				dl->color.g = 219;
+				dl->color.b = 14;
+				dl->die = gpGlobals->curtime + 0.05f;
+				dl->radius = random->RandomFloat(245.0f, 256.0f);
+				dl->decay = 512.0f;
+			}
+			else if (cl_muzzleflash_dlight.GetInt() == 2)
+			{
+				Vector vAttachment, vAng;
+				QAngle angles;
+#ifdef HL2_EPISODIC
+				GetAttachment(1, vAttachment, angles); // set 1 instead "attachment"
+#else
+				GetAttachment(attachment, vAttachment, angles);
+#endif
+				AngleVectors(angles, &vAng);
+				vAttachment += vAng * 2;
+
+				dlight_t *dl = effects->CL_AllocDlight(index);
+				dl->origin = vAttachment;
+				dl->color.r = 252;
+				dl->color.g = 238;
+				dl->color.b = 128;
+				dl->die = gpGlobals->curtime + 0.05f;
+				dl->radius = random->RandomFloat(245.0f, 256.0f);
+				dl->decay = 512.0f;
+			}
+			else if (cl_muzzleflash_dlight.GetInt() == 3)
+			{
+				Vector vAttachment, vAng;
+				QAngle angles;
+#ifdef HL2_EPISODIC
+				GetAttachment(1, vAttachment, angles); // set 1 instead "attachment"
+#else
+				GetAttachment(attachment, vAttachment, angles);
+#endif
+				AngleVectors(angles, &vAng);
+				vAttachment += vAng * 2;
+
+				dlight_t *dl = effects->CL_AllocDlight(index);
+				dl->origin = vAttachment;
+				dl->color.r = 255;
+				dl->color.g = 192;
+				dl->color.b = 64;
+				dl->die = gpGlobals->curtime + 0.05f;
+				dl->radius = random->RandomFloat(245.0f, 256.0f);
+				dl->decay = 512.0f;
+			}
+			else if (cl_muzzleflash_dlight.GetInt() > 3 || cl_muzzleflash_dlight.GetInt() == 0)
+			{
+				Vector vAttachment;
+				QAngle dummyAngles;
+				GetAttachment(1, vAttachment, dummyAngles);
+
+				// Make an elight
+				dlight_t *el = effects->CL_AllocElight(LIGHT_INDEX_MUZZLEFLASH + index);
+				el->origin = vAttachment;
+				el->radius = random->RandomInt(32, 64);
+				el->decay = el->radius / 0.05f;
+				el->die = gpGlobals->curtime + 0.05f;
+				el->color.r = 255;
+				el->color.g = 192;
+				el->color.b = 64;
+				el->color.exponent = 5;
+			}
 		}
 	}
 }
@@ -4694,7 +4774,7 @@ C_BaseAnimating *C_BaseAnimating::CreateRagdollCopy()
 	}
 
 	m_builtRagdoll = true;
-	AddEffects( EF_NODRAW );
+	//AddEffects( EF_NODRAW );
 
 	if ( IsEffectActive( EF_NOSHADOW ) )
 	{

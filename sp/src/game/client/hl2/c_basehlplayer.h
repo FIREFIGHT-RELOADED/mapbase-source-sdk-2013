@@ -38,6 +38,7 @@ public:
 	bool				IsFlashlightActive( void ) { return m_HL2Local.m_bitsActiveDevices & bits_SUIT_DEVICE_FLASHLIGHT; }
 	bool				IsBreatherActive( void ) { return m_HL2Local.m_bitsActiveDevices & bits_SUIT_DEVICE_BREATHER; }
 
+	//device0 is bullettime
 #ifdef MAPBASE
 	bool				IsCustomDevice0Active( void ) { return m_HL2Local.m_bitsActiveDevices & bits_SUIT_DEVICE_CUSTOM0; }
 	bool				IsCustomDevice1Active( void ) { return m_HL2Local.m_bitsActiveDevices & bits_SUIT_DEVICE_CUSTOM1; }
@@ -57,6 +58,17 @@ public:
 	void			PerformClientSideNPCSpeedModifiers( float flFrameTime, CUserCmd *pCmd );
 
 	bool				IsWeaponLowered( void ) { return m_HL2Local.m_bWeaponLowered; }
+	IRagdoll* GetRepresentativeRagdoll() const;
+	virtual void CalcView(Vector &eyeOrigin, QAngle &eyeAngles, float &zNear, float &zFar, float &fov);
+	virtual const QAngle& GetRenderAngles();
+	virtual bool ShouldDraw(void);
+	virtual C_BaseAnimating *BecomeRagdollOnClient();
+	virtual ShadowType_t		ShadowCastType(void);
+	virtual void DoImpactEffect(trace_t &tr, int nDamageType);
+	virtual bool ShouldReceiveProjectedTextures(int flags);
+
+	CSinglePlayerAnimState *m_pPlayerAnimState;
+	QAngle m_angEyeAngles;
 
 public:
 

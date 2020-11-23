@@ -687,12 +687,12 @@ void CNPC_Assassin::StartTask( const Task_t *pTask )
 
 			Vector	goalPos;
 
-			CHintCriteria	hint;
+			CHintCriteria	criteria;
 
 			// Find a disadvantage node near the player, but away from ourselves
-			hint.SetHintType( HINT_TACTICAL_ENEMY_DISADVANTAGED );
-			hint.AddExcludePosition( GetAbsOrigin(), 256 );
-			hint.AddExcludePosition( GetEnemy()->GetAbsOrigin(), 256 );
+			criteria.SetHintType(HINT_TACTICAL_ENEMY_DISADVANTAGED);
+			criteria.AddExcludePosition(GetAbsOrigin(), 256);
+			criteria.AddExcludePosition(GetEnemy()->GetAbsOrigin(), 256);
 
 			if ( ( m_pSquad != NULL ) && ( m_pSquad->NumMembers() > 1 ) )
 			{
@@ -702,13 +702,13 @@ void CNPC_Assassin::StartTask( const Task_t *pTask )
 					if ( pSquadMember == NULL )
 						continue;
 
-					hint.AddExcludePosition( pSquadMember->GetAbsOrigin(), 128 );
+					criteria.AddExcludePosition(pSquadMember->GetAbsOrigin(), 128);
 				}
 			}
 	
-			hint.SetFlag( bits_HINT_NODE_NEAREST );
+			criteria.SetFlag(bits_HINT_NODE_NEAREST);
 
-			CAI_Hint *pHint = CAI_HintManager::FindHint( this, GetEnemy()->GetAbsOrigin(), &hint );
+			CAI_Hint *pHint = CAI_HintManager::FindHint( this, GetEnemy()->GetAbsOrigin(), criteria );
 
 			if ( pHint == NULL )
 			{

@@ -47,6 +47,11 @@ public:
 	Disposition_t IRelationType( CBaseEntity *pTarget );
 	int OnTakeDamage_Alive( const CTakeDamageInfo &inputInfo );
 
+	virtual bool GetSpitVector(const Vector &vecStartPos, const Vector &vecTarget, Vector *vecOut);
+	virtual bool InnateWeaponLOSCondition(const Vector &ownerPos, const Vector &targetPos, bool bSetConditions);
+
+	bool SeenEnemyWithinTime(float flTime);
+
 	int GetSoundInterests ( void );
 	void RunAI ( void );
 	virtual void OnListened ( void );
@@ -57,6 +62,8 @@ public:
 	void StartTask ( const Task_t *pTask );
 	void RunTask ( const Task_t *pTask );
 
+	Vector	m_vecSaveSpitVelocity;
+
 	NPC_STATE SelectIdealState ( void );
 
 	DEFINE_CUSTOM_AI;
@@ -66,7 +73,6 @@ private:
 	bool  m_fCanThreatDisplay;// this is so the squid only does the "I see a headcrab!" dance one time. 
 	float m_flLastHurtTime;// we keep track of this, because if something hurts a squid, it will forget about its love of headcrabs for a while.
 	float m_flNextSpitTime;// last time the bullsquid used the spit attack.
-	int   m_nSquidSpitSprite;
 	float m_flHungryTime;// set this is a future time to stop the monster from eating for a while. 
 
 	float m_nextSquidSoundTime;

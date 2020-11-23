@@ -139,6 +139,8 @@ ConVar	sk_helicopter_grenade_puntscale( "sk_helicopter_grenade_puntscale","1.5",
 ConVar sk_helicopter_num_bombs1("sk_helicopter_num_bombs1", "3");
 ConVar sk_helicopter_num_bombs2("sk_helicopter_num_bombs2", "5");
 ConVar sk_helicopter_num_bombs3("sk_helicopter_num_bombs3", "5");
+ConVar sk_helicopter_num_bombs4("sk_helicopter_num_bombs4", "7");
+ConVar sk_helicopter_num_bombs5("sk_helicopter_num_bombs5", "9");
 
 ConVar	sk_npc_dmg_helicopter_to_plr( "sk_npc_dmg_helicopter_to_plr","3", 0, "Damage helicopter shots deal to the player" );
 ConVar	sk_npc_dmg_helicopter( "sk_npc_dmg_helicopter","6", 0, "Damage helicopter shots deal to everything but the player" );
@@ -3507,7 +3509,7 @@ void CNPC_AttackHelicopter::DropCorpse( int nDamage )
 	vecForceVector.z = 0.5;
 	vecForceVector *= forceScale;
 
-	CBaseEntity *pGib = CreateRagGib( "models/combine_soldier.mdl", GetAbsOrigin(), GetAbsAngles(), vecForceVector );
+	CBaseEntity *pGib = CreateRagGib(this, "models/combine_soldier.mdl", GetAbsOrigin(), GetAbsAngles(), vecForceVector);
 	if ( pGib )
 	{
 		pGib->SetOwnerEntity( this );
@@ -3577,6 +3579,14 @@ int CNPC_AttackHelicopter::OnTakeDamage( const CTakeDamageInfo &info )
 		else if( g_pGameRules->IsSkillLevel(SKILL_HARD) )
 		{
 			damage = GetMaxHealth() / sk_helicopter_num_bombs3.GetFloat();
+		}
+		else if (g_pGameRules->IsSkillLevel(SKILL_VERYHARD))
+		{
+			damage = GetMaxHealth() / sk_helicopter_num_bombs4.GetFloat();
+		}
+		else if (g_pGameRules->IsSkillLevel(SKILL_NIGHTMARE))
+		{
+			damage = GetMaxHealth() / sk_helicopter_num_bombs5.GetFloat();
 		}
 		else // Medium, or unspecified
 		{
@@ -5625,7 +5635,7 @@ void CGrenadeHelicopter::OnPhysGunDrop( CBasePlayer *pPhysGunUser, PhysGunDrop_t
 bool CGrenadeHelicopter::IsThrownByPlayer()
 {
 	// if player is the owner and we're set to explode on contact, then the player threw this grenade.
-	return ( ( GetOwnerEntity() == UTIL_GetLocalPlayer() ) && m_bExplodeOnContact );
+	return (m_bExplodeOnContact);
 }
 
 //-----------------------------------------------------------------------------

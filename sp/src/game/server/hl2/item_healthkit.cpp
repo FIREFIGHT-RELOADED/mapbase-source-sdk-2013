@@ -18,6 +18,7 @@
 ConVar	sk_healthkit( "sk_healthkit","0" );		
 ConVar	sk_healthvial( "sk_healthvial","0" );		
 ConVar	sk_healthcharger( "sk_healthcharger","0" );		
+ConVar	sk_healthcharger_usesmoney("sk_healthcharger_usesmoney", "1", FCVAR_ARCHIVE);
 
 //-----------------------------------------------------------------------------
 // Small health kit. Heals the player when picked up.
@@ -329,17 +330,43 @@ void CWallHealth::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE u
 		return;
 	}
 
-	if( pActivator->GetHealth() >= pActivator->GetMaxHealth() )
+	if (sk_healthcharger_usesmoney.GetBool() && g_fr_economy.GetBool())
 	{
-		if( pPlayer )
+		if (pPlayer->GetMoney() > 0)
 		{
-			pPlayer->m_afButtonPressed &= ~IN_USE;
+			pPlayer->RemoveMoney(1);
 		}
 
-		// Make the user re-use me to get started drawing health.
-		m_iCaps = FCAP_IMPULSE_USE;
+		if (pPlayer->GetMoney() <= 0)
+		{
+			if (m_flSoundTime <= gpGlobals->curtime)
+			{
+				m_flSoundTime = gpGlobals->curtime + 0.62;
+				EmitSound("WallHealth.Deny");
+			}
+			return;
+		}
+	}
 
-		return;
+	if (pPlayer)
+	{
+		if (pPlayer->GetHealth() >= pPlayer->GetMaxMaxHealthRegenValue())
+		{
+			pPlayer->m_afButtonPressed &= ~IN_USE;
+			m_iCaps = FCAP_IMPULSE_USE;
+			EmitSound("WallHealth.Deny");
+			return;
+		}
+	}
+	else
+	{
+		if (pActivator->GetHealth() >= pActivator->GetMaxHealth())
+		{
+			// Make the user re-use me to get started drawing health.
+			m_iCaps = FCAP_IMPULSE_USE;
+			EmitSound("WallHealth.Deny");
+			return;
+		}
 	}
 
 	SetNextThink( gpGlobals->curtime + 0.25f );
@@ -798,18 +825,43 @@ void CNewWallHealth::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYP
 		return;
 	}
 
-	if( pActivator->GetHealth() >= pActivator->GetMaxHealth() )
+	if (sk_healthcharger_usesmoney.GetBool() && g_fr_economy.GetBool())
 	{
-		if( pPlayer )
+		if (pPlayer->GetMoney() > 0)
 		{
-			pPlayer->m_afButtonPressed &= ~IN_USE;
+			pPlayer->RemoveMoney(1);
 		}
 
-		// Make the user re-use me to get started drawing health.
-		m_iCaps = FCAP_IMPULSE_USE;
-		
-		EmitSound( "WallHealth.Deny" );
-		return;
+		if (pPlayer->GetMoney() <= 0)
+		{
+			if (m_flSoundTime <= gpGlobals->curtime)
+			{
+				m_flSoundTime = gpGlobals->curtime + 0.62;
+				EmitSound("WallHealth.Deny");
+			}
+			return;
+		}
+	}
+
+	if (pPlayer)
+	{
+		if (pPlayer->GetHealth() >= pPlayer->GetMaxMaxHealthRegenValue())
+		{
+			pPlayer->m_afButtonPressed &= ~IN_USE;
+			m_iCaps = FCAP_IMPULSE_USE;
+			EmitSound("WallHealth.Deny");
+			return;
+		}
+	}
+	else
+	{
+		if (pActivator->GetHealth() >= pActivator->GetMaxHealth())
+		{
+			// Make the user re-use me to get started drawing health.
+			m_iCaps = FCAP_IMPULSE_USE;
+			EmitSound("WallHealth.Deny");
+			return;
+		}
 	}
 
 	SetNextThink( gpGlobals->curtime + CHARGE_RATE );

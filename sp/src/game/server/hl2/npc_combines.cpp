@@ -24,6 +24,7 @@
 #include "hl2_gamerules.h"
 #include "gameweaponmanager.h"
 #include "vehicle_base.h"
+#include "gib.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -31,17 +32,12 @@
 ConVar	sk_combine_s_health( "sk_combine_s_health","0");
 ConVar	sk_combine_s_kick( "sk_combine_s_kick","0");
 
-ConVar sk_combine_guard_health( "sk_combine_guard_health", "0");
-ConVar sk_combine_guard_kick( "sk_combine_guard_kick", "0");
- 
-// Whether or not the combine guard should spawn health on death
-ConVar combine_guard_spawn_health( "combine_guard_spawn_health", "1" );
-
 extern ConVar sk_plr_dmg_buckshot;	
 extern ConVar sk_plr_num_shotgun_pellets;
 
 //Whether or not the combine should spawn health on death
 ConVar	combine_spawn_health( "combine_spawn_health", "1" );
+ConVar	combine_soldier_spawnwithgrenades("combine_soldier_spawnwithgrenades", "1", FCVAR_ARCHIVE);
 
 LINK_ENTITY_TO_CLASS( npc_combine_s, CNPC_CombineS );
 
@@ -57,34 +53,50 @@ extern Activity ACT_WALK_MARCH;
 void CNPC_CombineS::Spawn( void )
 {
 	Precache();
-	SetModel( STRING( GetModelName() ) );
+	SetModel( "models/combine_soldier.mdl" );
 
-	if( IsElite() )
+	//Give him a random amount of grenades on spawn
+	if (combine_soldier_spawnwithgrenades.GetBool())
 	{
-		// Stronger, tougher.
-		SetHealth( sk_combine_guard_health.GetFloat() );
-		SetMaxHealth( sk_combine_guard_health.GetFloat() );
-		SetKickDamage( sk_combine_guard_kick.GetFloat() );
+		if (g_pGameRules->IsSkillLevel(SKILL_HARD))
+		{
+			m_iNumGrenades = random->RandomInt(2, 3);
+		}
+		else if (g_pGameRules->IsSkillLevel(SKILL_VERYHARD))
+		{
+			m_iNumGrenades = random->RandomInt(4, 6);
+		}
+		else if (g_pGameRules->IsSkillLevel(SKILL_NIGHTMARE))
+		{
+			m_iNumGrenades = random->RandomInt(8, 12);
+		}
+		else
+		{
+			m_iNumGrenades = random->RandomInt(0, 2);
+		}
 	}
-	else
-	{
+
+	m_fIsElite = false;
+	m_fIsAce = false;
+	m_fIsPlayer = false;
+	m_iUseMarch = true;
+
 		SetHealth( sk_combine_s_health.GetFloat() );
 		SetMaxHealth( sk_combine_s_health.GetFloat() );
 		SetKickDamage( sk_combine_s_kick.GetFloat() );
-	}
 
 	CapabilitiesAdd( bits_CAP_ANIMATEDFACE );
 	CapabilitiesAdd( bits_CAP_MOVE_SHOOT );
+	CapabilitiesAdd(bits_CAP_MOVE_JUMP);
 	CapabilitiesAdd( bits_CAP_DOORS_GROUP );
 
 	BaseClass::Spawn();
 
-#if HL2_EPISODIC
+
 	if (m_iUseMarch && !HasSpawnFlags(SF_NPC_START_EFFICIENT))
 	{
 		Msg( "Soldier %s is set to use march anim, but is not an efficient AI. The blended march anim can only be used for dead-ahead walks!\n", GetDebugName() );
 	}
-#endif
 }
 
 //-----------------------------------------------------------------------------
@@ -94,32 +106,20 @@ void CNPC_CombineS::Spawn( void )
 //-----------------------------------------------------------------------------
 void CNPC_CombineS::Precache()
 {
-	const char *pModelName = STRING( GetModelName() );
+	PrecacheModel( "models/combine_soldier.mdl" );
+	PrecacheModel("models/gibs/combine_soldier_beheaded.mdl");
 
-#ifdef MAPBASE
-	// Need to do this for dirt variant
-	if( !Q_strnicmp( pModelName, "models/combine_super_sold", 25 ) )
-#else
-	if( !Q_stricmp( pModelName, "models/combine_super_soldier.mdl" ) )
-#endif
-	{
-		m_fIsElite = true;
-	}
-	else
-	{
-		m_fIsElite = false;
-	}
-
-	if( !GetModelName() )
-	{
-		SetModelName( MAKE_STRING( "models/combine_soldier.mdl" ) );
-	}
-
-	PrecacheModel( STRING( GetModelName() ) );
+	//GIBS!
+	PrecacheModel("models/gibs/soldier_head.mdl");
+	PrecacheModel("models/gibs/soldier_left_arm.mdl");
+	PrecacheModel("models/gibs/soldier_right_arm.mdl");
+	PrecacheModel("models/gibs/soldier_torso.mdl");
+	PrecacheModel("models/gibs/soldier_pelvis.mdl");
+	PrecacheModel("models/gibs/soldier_left_leg.mdl");
+	PrecacheModel("models/gibs/soldier_right_leg.mdl");
 
 	UTIL_PrecacheOther( "item_healthvial" );
 	UTIL_PrecacheOther( "weapon_frag" );
-	UTIL_PrecacheOther( "item_ammo_ar2_altfire" );
 
 	BaseClass::Precache();
 }
@@ -134,6 +134,9 @@ void CNPC_CombineS::DeathSound( const CTakeDamageInfo &info )
 #else
 	// NOTE: The response system deals with this at the moment
 	if ( GetFlags() & FL_DISSOLVING )
+		return;
+
+	if (IsOnFire())
 		return;
 
 	GetSentences()->Speak( "COMBINE_DIE", SENTENCE_PRIORITY_INVALID, SENTENCE_CRITERIA_ALWAYS ); 
@@ -221,6 +224,58 @@ float CNPC_CombineS::GetHitgroupDamageMultiplier( int iHitGroup, const CTakeDama
 	switch( iHitGroup )
 	{
 	case HITGROUP_HEAD:
+		if (!(g_Language.GetInt() == LANGUAGE_GERMAN || UTIL_IsLowViolence()) && g_fr_headshotgore.GetBool())
+		{
+			if ((info.GetDamageType() & (DMG_SNIPER | DMG_BUCKSHOT)) && !(info.GetDamageType() & DMG_NEVERGIB))
+			{
+				SetModel("models/gibs/combine_soldier_beheaded.mdl");
+				DispatchParticleEffect("smod_headshot_r", PATTACH_POINT_FOLLOW, this, "bloodspurt", true);
+				SpawnBlood(GetAbsOrigin(), g_vecAttackDir, BloodColor(), info.GetDamage());
+				CGib::SpawnSpecificStickyGibs(this, 3, 150, 450, "models/gibs/pgib_p3.mdl", 6);
+				CGib::SpawnSpecificStickyGibs(this, 3, 150, 450, "models/gibs/pgib_p4.mdl", 6);
+				CGib::SpawnSpecificStickyGibs(this, 3, 150, 450, "models/gibs/pgib_p3.mdl", 6);
+				CGib::SpawnSpecificStickyGibs(this, 3, 150, 450, "models/gibs/pgib_p4.mdl", 6);
+				EmitSound("Gore.Headshot");
+				m_iHealth = 0;
+				Event_Killed(info);
+				g_pGameRules->iHeadshotCount += 1;
+				CBasePlayer *pPlayer = UTIL_PlayerByIndex(1);
+				if (g_fr_economy.GetBool())
+				{
+					pPlayer->AddMoney(5);
+				}
+				if (!g_fr_classic.GetBool())
+				{
+					pPlayer->AddXP(7);
+				}
+			}
+			else if ((info.GetDamageType() & (DMG_SLASH)) && !(info.GetDamageType() & DMG_NEVERGIB))
+			{
+				SetModel("models/gibs/combine_soldier_beheaded.mdl");
+				DispatchParticleEffect("smod_blood_decap_r", PATTACH_POINT_FOLLOW, this, "bloodspurt", true);
+				SpawnBlood(GetAbsOrigin(), g_vecAttackDir, BloodColor(), info.GetDamage());
+				CGib::SpawnSpecificGibs(this, 1, 150, 450, "models/gibs/soldier_head.mdl", 6);
+				CGib::SpawnSpecificStickyGibs(this, 3, 150, 450, "models/gibs/pgib_p4.mdl", 6);
+				EmitSound("Gore.Headshot");
+				m_iHealth = 0;
+				Event_Killed(info);
+				CBasePlayer *pPlayer = UTIL_PlayerByIndex(1);
+				if (g_fr_economy.GetBool())
+				{
+					pPlayer->AddMoney(7);
+				}
+				if (!g_fr_classic.GetBool())
+				{
+					pPlayer->AddXP(9);
+				}
+			}
+			else
+			{
+				// Soldiers take double headshot damage
+				return 2.0f;
+			}
+		}
+		else
 		{
 			// Soldiers take double headshot damage
 			return 2.0f;
@@ -255,14 +310,10 @@ void CNPC_CombineS::OnChangeActivity( Activity eNewActivity )
 
 	BaseClass::OnChangeActivity( eNewActivity );
 
-#if HL2_EPISODIC
-	// Give each trooper a varied look for his march. Done here because if you do it earlier (eg Spawn, StartTask), the
-	// pose param gets overwritten.
 	if (m_iUseMarch)
 	{
-		SetPoseParameter("casual", RandomFloat());
+		SetPoseParameter("casual", 1.0);
 	}
-#endif
 }
 
 void CNPC_CombineS::OnListened()
@@ -293,6 +344,95 @@ void CNPC_CombineS::OnListened()
 //-----------------------------------------------------------------------------
 void CNPC_CombineS::Event_Killed( const CTakeDamageInfo &info )
 {
+	if (!(g_Language.GetInt() == LANGUAGE_GERMAN || UTIL_IsLowViolence()) && info.GetDamageType() & (DMG_BLAST | DMG_CRUSH) && !(info.GetDamageType() & (DMG_DISSOLVE)) && !PlayerHasMegaPhysCannon())
+	{
+		Vector vecDamageDir = info.GetDamageForce();
+		SpawnBlood(GetAbsOrigin(), g_vecAttackDir, BloodColor(), info.GetDamage());
+		DispatchParticleEffect("smod_blood_gib_r", GetAbsOrigin(), GetAbsAngles(), this);
+		EmitSound("Gore.Headshot");
+		float flFadeTime = 25.0;
+
+		CGib::SpawnSpecificGibs(this, 1, 750, 1500, "models/gibs/soldier_head.mdl", flFadeTime);
+		
+		Vector vecRagForce;
+		vecRagForce.x = random->RandomFloat(-400, 400);
+		vecRagForce.y = random->RandomFloat(-400, 400);
+		vecRagForce.z = random->RandomFloat(0, 250);
+
+		Vector vecRagDmgForce = (vecRagForce + vecDamageDir);
+
+		CBaseEntity *pLeftArmGib = CreateRagGib(this, "models/gibs/soldier_left_arm.mdl", GetAbsOrigin(), GetAbsAngles(), vecRagDmgForce, flFadeTime, IsOnFire());
+		if (pLeftArmGib)
+		{ 
+			color32 color = pLeftArmGib->GetRenderColor();
+			pLeftArmGib->SetRenderColor(color.r, color.g, color.b, color.a);
+		}
+
+		CBaseEntity *pRightArmGib = CreateRagGib(this, "models/gibs/soldier_right_arm.mdl", GetAbsOrigin(), GetAbsAngles(), vecRagDmgForce, flFadeTime, IsOnFire());
+		if (pRightArmGib)
+		{
+			color32 color = pRightArmGib->GetRenderColor();
+			pRightArmGib->SetRenderColor(color.r, color.g, color.b, color.a);
+		}
+
+		CBaseEntity *pTorsoGib = CreateRagGib(this, "models/gibs/soldier_torso.mdl", GetAbsOrigin(), GetAbsAngles(), vecRagDmgForce, flFadeTime, IsOnFire());
+		if (pTorsoGib)
+		{
+			color32 color = pTorsoGib->GetRenderColor();
+			pTorsoGib->SetRenderColor(color.r, color.g, color.b, color.a);
+		}
+
+		CBaseEntity *pPelvisGib = CreateRagGib(this, "models/gibs/soldier_pelvis.mdl", GetAbsOrigin(), GetAbsAngles(), vecRagDmgForce, flFadeTime, IsOnFire());
+		if (pPelvisGib)
+		{
+			color32 color = pPelvisGib->GetRenderColor();
+			pPelvisGib->SetRenderColor(color.r, color.g, color.b, color.a);
+		}
+
+		CBaseEntity *pLeftLegGib = CreateRagGib(this, "models/gibs/soldier_left_leg.mdl", GetAbsOrigin(), GetAbsAngles(), vecRagDmgForce, flFadeTime, IsOnFire());
+		if (pLeftLegGib)
+		{
+			color32 color = pLeftLegGib->GetRenderColor();
+			pLeftLegGib->SetRenderColor(color.r, color.g, color.b, color.a);
+		}
+
+		CBaseEntity *pRightLegGib = CreateRagGib(this, "models/gibs/soldier_right_leg.mdl", GetAbsOrigin(), GetAbsAngles(), vecRagDmgForce, flFadeTime, IsOnFire());
+		if (pRightLegGib)
+		{
+			color32 color = pRightLegGib->GetRenderColor();
+			pRightLegGib->SetRenderColor(color.r, color.g, color.b, color.a);
+		}
+
+		//now add smaller gibs.
+		CGib::SpawnSpecificGibs(this, 3, 750, 1500, "models/gibs/pgib_p3.mdl", flFadeTime);
+		CGib::SpawnSpecificGibs(this, 3, 750, 1500, "models/gibs/pgib_p4.mdl", flFadeTime);
+
+		Vector forceVector = CalcDamageForceVector(info);
+
+		// Drop any weapon that I own
+		if (m_hActiveWeapon)
+		{
+			if (VPhysicsGetObject())
+			{
+				Vector weaponForce = forceVector * VPhysicsGetObject()->GetInvMass();
+				Weapon_Drop(m_hActiveWeapon, NULL, &weaponForce);
+			}
+			else
+			{
+				Weapon_Drop(m_hActiveWeapon);
+			}
+		}
+
+		if (info.GetAttacker()->IsPlayer())
+		{
+			((CSingleplayRules*)GameRules())->NPCKilled(this, info);
+		}
+
+		UTIL_Remove(this);
+		SetThink(NULL);
+		return;
+	}
+	
 	// Don't bother if we've been told not to, or the player has a megaphyscannon
 	if ( combine_spawn_health.GetBool() == false || PlayerHasMegaPhysCannon() )
 	{
@@ -313,53 +453,6 @@ void CNPC_CombineS::Event_Killed( const CTakeDamageInfo &info )
 
 	if ( pPlayer != NULL )
 	{
-		// Elites drop alt-fire ammo, so long as they weren't killed by dissolving.
-		if( IsElite() )
-		{
-#ifdef HL2_EPISODIC
-			if ( HasSpawnFlags( SF_COMBINE_NO_AR2DROP ) == false )
-#endif
-			{
-#ifdef MAPBASE
-				CBaseEntity *pItem;
-				if (GetActiveWeapon() && FClassnameIs(GetActiveWeapon(), "weapon_smg1"))
-					pItem = DropItem( "item_ammo_smg1_grenade", WorldSpaceCenter()+RandomVector(-4,4), RandomAngle(0,360) );
-				else
-					pItem = DropItem( "item_ammo_ar2_altfire", WorldSpaceCenter()+RandomVector(-4,4), RandomAngle(0,360) );
-#else
-				CBaseEntity *pItem = DropItem( "item_ammo_ar2_altfire", WorldSpaceCenter()+RandomVector(-4,4), RandomAngle(0,360) );
-#endif
-
-				if ( pItem )
-				{
-					IPhysicsObject *pObj = pItem->VPhysicsGetObject();
-
-					if ( pObj )
-					{
-						Vector			vel		= RandomVector( -64.0f, 64.0f );
-						AngularImpulse	angImp	= RandomAngularImpulse( -300.0f, 300.0f );
-
-						vel[2] = 0.0f;
-						pObj->AddVelocity( &vel, &angImp );
-					}
-
-					if( info.GetDamageType() & DMG_DISSOLVE )
-					{
-						CBaseAnimating *pAnimating = dynamic_cast<CBaseAnimating*>(pItem);
-
-						if( pAnimating )
-						{
-							pAnimating->Dissolve( NULL, gpGlobals->curtime, false, ENTITY_DISSOLVE_NORMAL );
-						}
-					}
-					else
-					{
-						WeaponManager_AddManaged( pItem );
-					}
-				}
-			}
-		}
-
 		CHalfLife2 *pHL2GameRules = static_cast<CHalfLife2 *>(g_pGameRules);
 
 		// Attempt to drop health

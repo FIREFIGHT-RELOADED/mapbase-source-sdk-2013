@@ -27,12 +27,16 @@ public:
 	void SetSecondaryValue(int value);
 	void SetShouldDisplayValue(bool state);
 	void SetShouldDisplaySecondaryValue(bool state);
+	void SetShouldDisplaySmallValue(bool state);
+	void SetShouldDisplaySmallValueMoney(bool state);
 	void SetLabelText(const wchar_t *text);
 	void SetIndent(bool state);
 	void SetIsTime(bool state);
 
 	bool ShouldDisplayValue( void ) { return m_bDisplayValue; }
 	bool ShouldDisplaySecondaryValue( void ) { return m_bDisplaySecondaryValue; }
+	bool ShouldDisplaySmallValue(void) { return m_bSmallDisplayValue; }
+	bool ShouldDisplaySmallValueMoney(void) { return m_bSmallDisplayValueMoney; }
 
 	virtual void Reset();
 
@@ -48,7 +52,7 @@ protected:
 	int m_iValue;
 	int m_iSecondaryValue;
 	wchar_t m_LabelText[32];
-	bool m_bDisplayValue, m_bDisplaySecondaryValue;
+	bool m_bDisplayValue, m_bDisplaySecondaryValue, m_bSmallDisplayValue, m_bSmallDisplayValueMoney;
 	bool m_bIndent;
 	bool m_bIsTime;
 
@@ -59,6 +63,9 @@ protected:
 	CPanelAnimationVar( vgui::HFont, m_hNumberFont, "NumberFont", "HudNumbers" );
 	CPanelAnimationVar( vgui::HFont, m_hNumberGlowFont, "NumberGlowFont", "HudNumbersGlow" );
 	CPanelAnimationVar( vgui::HFont, m_hSmallNumberFont, "SmallNumberFont", "HudNumbersSmall" );
+	CPanelAnimationVar( vgui::HFont, m_hSmallNumberGlowFont, "SmallNumberGlowFont", "HudNumbersGlowSmall" );
+	CPanelAnimationVar( vgui::HFont, m_hSmallNumberFontMoney, "SmallNumberFont", "HudNumbersSmallMoney" );
+	CPanelAnimationVar( vgui::HFont, m_hSmallNumberGlowFontMoney, "SmallNumberGlowFont", "HudNumbersGlowSmallMoney" );
 	CPanelAnimationVar( vgui::HFont, m_hTextFont, "TextFont", "Default" );
 
 	CPanelAnimationVarAliasType( float, text_xpos, "text_xpos", "8", "proportional_float" );

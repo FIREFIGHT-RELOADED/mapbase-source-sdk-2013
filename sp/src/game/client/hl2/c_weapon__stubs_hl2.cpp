@@ -37,6 +37,18 @@ STUB_WEAPON_CLASS( weapon_crossbow, WeaponCrossbow, C_BaseHLCombatWeapon );
 STUB_WEAPON_CLASS( weapon_slam, Weapon_SLAM, C_BaseHLCombatWeapon );
 #endif
 STUB_WEAPON_CLASS( weapon_crowbar, WeaponCrowbar, C_BaseHLBludgeonWeapon );
+STUB_WEAPON_CLASS( weapon_positiongrabber, WeaponPositionGrabber, C_BaseHLCombatWeapon );
+STUB_WEAPON_CLASS( weapon_sniper_rifle, WeaponSniperRifle, C_BaseHLCombatWeapon );
+STUB_WEAPON_CLASS( weapon_deagle, WeaponDeagle, C_BaseHLCombatWeapon );
+STUB_WEAPON_CLASS( weapon_m249para, WeaponM249Para, C_BaseHLCombatWeapon );
+STUB_WEAPON_CLASS(weapon_oicw, WeaponOICW, C_HLMachineGun);
+STUB_WEAPON_CLASS(weapon_flaregun, Flaregun, C_BaseHLCombatWeapon);
+STUB_WEAPON_CLASS(weapon_knife, WeaponKnife, C_BaseHLBludgeonWeapon);
+STUB_WEAPON_CLASS(weapon_gauss, WeaponGaussGun, C_BaseHLCombatWeapon);
+//STUB_WEAPON_CLASS(weapon_egon, WeaponEgon, C_BaseHLCombatWeapon);
+STUB_WEAPON_CLASS(weapon_mp5, WeaponMP5, C_HLMachineGun);
+STUB_WEAPON_CLASS(weapon_katana, WeaponKatana, C_BaseHLBludgeonWeapon);
+STUB_WEAPON_CLASS(weapon_grapple, WeaponGrapple, C_BaseHLCombatWeapon);
 #ifdef HL2_EPISODIC
 STUB_WEAPON_CLASS( weapon_hopwire, WeaponHopwire, C_BaseHLCombatWeapon );
 //STUB_WEAPON_CLASS( weapon_proto1, WeaponProto1, C_BaseHLCombatWeapon );

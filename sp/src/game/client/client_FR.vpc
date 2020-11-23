@@ -5,8 +5,7 @@
 //-----------------------------------------------------------------------------
 
 $Macro SRCDIR		"..\.."
-$Macro GAMENAME 	"firefightreloaded" [!$SOURCESDK]
-$Macro GAMENAME 	"firefightreloaded" [$SOURCESDK]
+$Macro GAMENAME 	"firefightreloaded"
 
 $Include "$SRCDIR\game\client\client_base.vpc"
 
@@ -15,7 +14,7 @@ $Configuration
 	$Compiler
 	{
 		$AdditionalIncludeDirectories	".\hl2;.\hl2\elements;$SRCDIR\game\shared\hl2;$SRCDIR\game\shared\episodic;..\..\public;$BASE"
-		$PreprocessorDefinitions		"$BASE;HL2_CLIENT_DLL;HL2_EPISODIC"
+		$PreprocessorDefinitions		"$BASE;HL2_CLIENT_DLL;HL2_EPISODIC;SOURCE_2013;FR_CLIENT;FR_DLL"
 	}
 }
 
@@ -26,6 +25,8 @@ $Project "Client (FIREFIGHT RELOADED)"
 		$File	"hud_chat.cpp"
 		$File	"c_team_objectiveresource.cpp"
 		$File	"c_team_objectiveresource.h"
+		$File	"$SRCDIR\game\shared\predicted_viewmodel.cpp"
+		$File	"$SRCDIR\game\shared\predicted_viewmodel.h"
 
 		$Folder	"HL2 DLL"
 		{
@@ -126,6 +127,115 @@ $Project "Client (FIREFIGHT RELOADED)"
 			$File	"$SRCDIR\game\shared\hl2\survival_gamerules.cpp"
 			$File	"hl2\vgui_rootpanel_hl2.cpp"
 			$File	"episodic\c_npc_puppet.cpp"
+		}
+		
+		$Folder	"FIREFIGHT RELOADED DLL"
+		{
+			$File	"$SRCDIR\game\shared\firefightreloaded\achievements_firefightreloaded.cpp"
+			$File	"firefightreloaded_clientcmds.cpp"
+			$File	"$SRCDIR\game\shared\firefightreloaded\singleplayer_animstate.cpp"
+			$File	"$SRCDIR\game\shared\firefightreloaded\singleplayer_animstate.h"
+			$File	"$SRCDIR\game\shared\firefightreloaded\fr_ragdoll.cpp"
+			$File	"$SRCDIR\game\shared\firefightreloaded\fr_ragdoll.h"
+			$File 	"firefightreloaded\fr_rendertargets.cpp"
+			$File 	"firefightreloaded\fr_rendertargets.h"
+			
+			$Folder	"NPCs"
+			{
+				$Folder	"Bot"
+				{
+					$File	"firefightreloaded\c_npc_player.cpp"
+				}
+				
+				$File	"firefightreloaded\c_combineguard.cpp"
+				$File	"firefightreloaded\c_npc_antlionguardian.cpp"
+			}
+
+			$Folder	"GameUI"
+			{
+				$File	"gameui\PanelListPanel.cpp"
+				$File	"gameui\PanelListPanel.h"
+				$File	"gameui\ScriptObject.cpp"
+				$File	"gameui\ScriptObject.h"
+				$File	"gameui\SingleplayerAdvancedDialog.cpp"
+				$File	"gameui\SingleplayerAdvancedDialog.h"
+				$File	"gameui\NewSingleplayerGameDialog.cpp"
+				$File	"gameui\NewSingleplayerGameDialog.h"
+				$File	"gameui\PlayerModelDialog.cpp"
+				$File	"gameui\PlayerModelDialog.h"
+			}
+			
+			$Folder "Store Menu"
+			{
+				$File	"firefightreloaded\fr_storemenu.cpp"
+				$File	"firefightreloaded\fr_storemenu.h"
+				$File	"firefightreloaded\fr_storemenu_ammo.cpp"
+				$File	"firefightreloaded\fr_storemenu_ammo.h"
+				$File	"firefightreloaded\fr_storemenu_supplies.cpp"
+				$File	"firefightreloaded\fr_storemenu_supplies.h"
+				$File	"firefightreloaded\fr_storemenu_weapons.cpp"
+				$File	"firefightreloaded\fr_storemenu_weapons.h"
+			}
+			
+			$Folder	"Main Menu"
+			{
+				$File 	"firefightreloaded\vgui\fr_controls.cpp"
+				$File 	"firefightreloaded\vgui\fr_controls.h"
+				$File 	"firefightreloaded\vgui\fr_imagepanel.cpp"
+				$File 	"firefightreloaded\vgui\fr_imagepanel.h"
+				$File 	"firefightreloaded\vgui\fr_mainmenu.cpp"
+				$File 	"firefightreloaded\vgui\fr_mainmenu.h"
+				$File 	"firefightreloaded\vgui\fr_mainmenu_interface.cpp"
+				$File 	"firefightreloaded\vgui\fr_mainmenu_interface.h"
+				$File 	"firefightreloaded\vgui\fr_mainmenubutton.cpp"
+				$File 	"firefightreloaded\vgui\fr_mainmenubutton.h"
+				$File 	"firefightreloaded\vgui\fr_mainmenubuttonbase.cpp"
+				$File 	"firefightreloaded\vgui\fr_mainmenubuttonbase.h"
+				$File 	"firefightreloaded\vgui\fr_mainmenupanel.cpp"
+				$File 	"firefightreloaded\vgui\fr_mainmenupanel.h"
+				$File 	"firefightreloaded\vgui\fr_mainmenupanelbase.cpp"
+				$File 	"firefightreloaded\vgui\fr_mainmenupanelbase.h"
+				$File 	"firefightreloaded\vgui\fr_vgui_video.cpp"
+				$File 	"firefightreloaded\vgui\fr_vgui_video.h"
+				$File 	"firefightreloaded\vgui\fr_tips.cpp"
+				$File 	"firefightreloaded\vgui\fr_tips.h"
+			}
+
+			$Folder	"HUD Elements"
+			{
+				$File	"firefightreloaded\hud_achievementhintdisplay.cpp"
+				$File	"firefightreloaded\hud_exp.cpp"
+				$File	"firefightreloaded\hud_kills.cpp"
+				$File	"firefightreloaded\hud_level.cpp"
+				$File	"firefightreloaded\hud_levelhintdisplay.cpp"
+				$File	"firefightreloaded\hud_money.cpp"
+				$File	"firefightreloaded\hud_money_classic.cpp"
+				$File	"firefightreloaded\hud_perkhintdisplay.cpp"
+				$File 	"firefightreloaded\hud_timer.cpp"
+				$File	"firefightreloaded\ui\frclientscoreboard.cpp"
+				$File	"firefightreloaded\ui\frclientscoreboard.h"
+			}
+			
+			$Folder	"Modding Menu"
+			{
+				$File	"firefightreloaded\fr_moddingmenu.cpp"
+				$File	"firefightreloaded\fr_moddingmenu.h"
+				$File	"firefightreloaded\fr_moddingmenu_mapping.cpp"
+				$File	"firefightreloaded\fr_moddingmenu_mapping.h"
+				$File	"firefightreloaded\fr_moddingmenu_mapping_mapadd.cpp"
+				$File	"firefightreloaded\fr_moddingmenu_mapping_mapadd.h"
+				$File	"firefightreloaded\fr_moddingmenu_mapping_noding.cpp"
+				$File	"firefightreloaded\fr_moddingmenu_mapping_noding.h"
+				$File	"firefightreloaded\fr_moddingmenu_weapons.cpp"
+				$File	"firefightreloaded\fr_moddingmenu_weapons.h"
+			}
+		}
+		
+		$Folder	"SMMOD DLL"
+		{
+			$File	"SMMOD\c_weapon_custom.cpp"
+			$File	"SMMOD\c_weapon_custom.h"
+			$File	"$SRCDIR\game\shared\SMMOD\shdef_customweapons.cpp"
 		}
 	}
 	

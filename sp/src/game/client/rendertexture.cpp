@@ -64,6 +64,18 @@ ITexture *GetFullscreenTexture( void )
 	return s_pFullscreenTexture;
 }
 
+static CTextureReference s_pScopeTexture;
+ITexture *GetScopeTexture(void)
+{
+	if (!s_pScopeTexture)
+	{
+		s_pScopeTexture.Init(materials->FindTexture("_rt_Scope", TEXTURE_GROUP_RENDER_TARGET));
+		Assert(!IsErrorTexture(s_pScopeTexture));
+		AddReleaseFunc();
+	}
+	return s_pScopeTexture;
+}
+
 //=============================================================================
 // Camera Texture
 //=============================================================================
@@ -246,6 +258,7 @@ ITexture *GetTeenyTexture( int which )
 void ReleaseRenderTargets( void )
 {
 	s_pPowerOfTwoFrameBufferTexture.Shutdown();
+	s_pScopeTexture.Shutdown();
 	s_pCameraTexture.Shutdown();
 	s_pWaterReflectionTexture.Shutdown();
 	s_pWaterRefractionTexture.Shutdown();

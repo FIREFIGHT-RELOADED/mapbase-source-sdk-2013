@@ -32,6 +32,7 @@ CHudNumericDisplay::CHudNumericDisplay(vgui::Panel *parent, const char *name) : 
 	m_iSecondaryValue = 0;
 	m_bDisplayValue = true;
 	m_bDisplaySecondaryValue = false;
+	m_bSmallDisplayValue = false;
 	m_bIndent = false;
 	m_bIsTime = false;
 }
@@ -74,6 +75,22 @@ void CHudNumericDisplay::SetShouldDisplayValue(bool state)
 void CHudNumericDisplay::SetShouldDisplaySecondaryValue(bool state)
 {
 	m_bDisplaySecondaryValue = state;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: data accessor
+//-----------------------------------------------------------------------------
+void CHudNumericDisplay::SetShouldDisplaySmallValue(bool state)
+{
+	m_bSmallDisplayValue = state;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: data accessor
+//-----------------------------------------------------------------------------
+void CHudNumericDisplay::SetShouldDisplaySmallValueMoney(bool state)
+{
+	m_bSmallDisplayValueMoney = state;
 }
 
 //-----------------------------------------------------------------------------
@@ -190,6 +207,54 @@ void CHudNumericDisplay::Paint()
 	{
 		surface()->DrawSetTextColor(GetFgColor());
 		PaintNumbers(m_hSmallNumberFont, digit2_xpos, digit2_ypos, m_iSecondaryValue);
+	}
+
+	if (m_bSmallDisplayValue)
+	{
+		// draw our numbers
+		surface()->DrawSetTextColor(GetFgColor());
+		PaintNumbers(m_hSmallNumberFont, digit_xpos, digit_ypos, m_iValue);
+
+		// draw the overbright blur
+		for (float fl = m_flBlur; fl > 0.0f; fl -= 1.0f)
+		{
+			if (fl >= 1.0f)
+			{
+				PaintNumbers(m_hSmallNumberGlowFont, digit_xpos, digit_ypos, m_iValue);
+			}
+			else
+			{
+				// draw a percentage of the last one
+				Color col = GetFgColor();
+				col[3] *= fl;
+				surface()->DrawSetTextColor(col);
+				PaintNumbers(m_hSmallNumberGlowFont, digit_xpos, digit_ypos, m_iValue);
+			}
+		}
+	}
+
+	if (m_bSmallDisplayValueMoney)
+	{
+		// draw our numbers
+		surface()->DrawSetTextColor(GetFgColor());
+		PaintNumbers(m_hSmallNumberFontMoney, digit_xpos, digit_ypos, m_iValue);
+
+		// draw the overbright blur
+		for (float fl = m_flBlur; fl > 0.0f; fl -= 1.0f)
+		{
+			if (fl >= 1.0f)
+			{
+				PaintNumbers(m_hSmallNumberGlowFontMoney, digit_xpos, digit_ypos, m_iValue);
+			}
+			else
+			{
+				// draw a percentage of the last one
+				Color col = GetFgColor();
+				col[3] *= fl;
+				surface()->DrawSetTextColor(col);
+				PaintNumbers(m_hSmallNumberGlowFontMoney, digit_xpos, digit_ypos, m_iValue);
+			}
+		}
 	}
 
 	PaintLabel();

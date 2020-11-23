@@ -1260,6 +1260,13 @@ int CNPC_AntlionGuard::SelectSchedule( void )
 	if ( m_NPCState == NPC_STATE_COMBAT && GetEnemy() )
 		return SelectCombatSchedule();
 
+	//If we are in idle, try to find the enemy by walking.
+	if (m_NPCState == NPC_STATE_IDLE || m_NPCState == NPC_STATE_ALERT)
+	{
+		//return SCHED_ANTLIONGUARD_PATROL_RUN;
+		return SCHED_PATROL_WALK_LOOP;
+	}
+
 	return BaseClass::SelectSchedule();
 }
 
@@ -1619,7 +1626,7 @@ public:
 //-----------------------------------------------------------------------------
 void CNPC_AntlionGuard::Footstep( bool bHeavy )
 {
-	CBasePlayer *pPlayer = AI_GetSinglePlayer();
+	CBasePlayer *pPlayer = UTIL_GetNearestPlayer(GetAbsOrigin());
 	Assert( pPlayer != NULL );
 	if ( pPlayer == NULL )
 		return;
@@ -2149,7 +2156,7 @@ int CNPC_AntlionGuard::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 	CTakeDamageInfo dInfo = info;
 
 	// Don't take damage from another antlion guard!
-	if ( dInfo.GetAttacker() && dInfo.GetAttacker() != this && FClassnameIs( dInfo.GetAttacker(), "npc_antlionguard" ) )
+	if (dInfo.GetAttacker() && dInfo.GetAttacker() != this && FClassnameIs(dInfo.GetAttacker(), "npc_antlionguard") && FClassnameIs(dInfo.GetAttacker(), "npc_antlionguardian"))
 		return 0;
 
 	if ( ( dInfo.GetDamageType() & DMG_CRUSH ) && !( dInfo.GetDamageType() & DMG_VEHICLE ) )
@@ -2168,6 +2175,14 @@ int CNPC_AntlionGuard::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 	if ( g_pGameRules->IsSkillLevel(SKILL_HARD) && !(info.GetDamageType() & DMG_CRUSH) )
 	{
 		dInfo.SetDamage( dInfo.GetDamage() * 0.75 );
+	}
+	else if (g_pGameRules->IsSkillLevel(SKILL_VERYHARD) && !(info.GetDamageType() & DMG_CRUSH))
+	{
+		dInfo.SetDamage(dInfo.GetDamage() * 1.0);
+	}
+	else if (g_pGameRules->IsSkillLevel(SKILL_NIGHTMARE) && !(info.GetDamageType() & DMG_CRUSH))
+	{
+		dInfo.SetDamage(dInfo.GetDamage() * 1.5);
 	}
 
 	// Cap damage taken by crushing (otherwise we can get crushed oddly)
@@ -2639,8 +2654,8 @@ public:
 					return false;
 			}
 
-			// If we hit an antlion, don't stop, but kill it
-			if ( pEntity->Classify() == CLASS_ANTLION )
+			// If we hit an antlion, don't stop, but kill it on easy
+			if ( pEntity->Classify() == CLASS_ANTLION && g_pGameRules->IsSkillLevel(SKILL_EASY) )
 			{
 				CBaseEntity *pGuard = (CBaseEntity*)EntityFromEntityHandle( m_pPassEnt );
 				ApplyChargeDamage( pGuard, pEntity, pEntity->GetHealth() );
@@ -3069,10 +3084,10 @@ void CNPC_AntlionGuard::RunTask( const Task_t *pTask )
 				}
 				else if ( moveTrace.pObstruction )
 				{
-					// If we hit an antlion, don't stop, but kill it
+					// If we hit an antlion, don't stop, but kill it on easy
 					if ( moveTrace.pObstruction->Classify() == CLASS_ANTLION )
 					{
-						if ( FClassnameIs( moveTrace.pObstruction, "npc_antlionguard" ) )
+						if (FClassnameIs(moveTrace.pObstruction, "npc_antlionguard") || FClassnameIs(moveTrace.pObstruction, "npc_antlionguardian"))
 						{
 							// Crash unless we're trying to stop already
 							if ( eActivity != ACT_ANTLIONGUARD_CHARGE_STOP )
@@ -3082,7 +3097,10 @@ void CNPC_AntlionGuard::RunTask( const Task_t *pTask )
 						}
 						else
 						{
-							ApplyChargeDamage( this, moveTrace.pObstruction, moveTrace.pObstruction->GetHealth() );
+							if (g_pGameRules->IsSkillLevel(SKILL_EASY))
+							{
+								ApplyChargeDamage(this, moveTrace.pObstruction, moveTrace.pObstruction->GetHealth());
+							}
 						}
 					}
 				}
@@ -4343,6 +4361,9 @@ void CNPC_AntlionGuard::InputDisableBark( inputdata_t &inputdata )
 //-----------------------------------------------------------------------------
 void CNPC_AntlionGuard::DeathSound( const CTakeDamageInfo &info )
 {
+	if (IsOnFire())
+		return;
+
 	EmitSound( "NPC_AntlionGuard.Die" );
 }
 

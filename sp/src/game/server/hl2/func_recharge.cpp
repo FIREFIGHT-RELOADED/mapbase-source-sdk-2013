@@ -25,6 +25,7 @@
 static ConVar	sk_suitcharger( "sk_suitcharger","0" );
 static ConVar	sk_suitcharger_citadel( "sk_suitcharger_citadel","0" );
 static ConVar	sk_suitcharger_citadel_maxarmor( "sk_suitcharger_citadel_maxarmor","0" );
+static ConVar	sk_suitcharger_usesmoney("sk_suitcharger_usesmoney", "1", FCVAR_ARCHIVE);
 
 #define SF_CITADEL_RECHARGER	0x2000
 #define SF_KLEINER_RECHARGER	0x4000 // Gives only 25 health
@@ -264,8 +265,10 @@ void CRecharge::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE use
 	if ( !pActivator || !pActivator->IsPlayer() )
 		return;
 
+	CBasePlayer *pl = (CBasePlayer *)m_hActivator.Get();
+
 	// Only usable if you have the HEV suit on
-	if ( !((CBasePlayer *)pActivator)->IsSuitEquipped() )
+	if (!pl->IsSuitEquipped())
 	{
 		if (m_flSoundTime <= gpGlobals->curtime)
 		{
@@ -291,6 +294,24 @@ void CRecharge::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE use
 			EmitSound( "SuitRecharge.Deny" );
 		}
 		return;
+	}
+
+	if (sk_suitcharger_usesmoney.GetBool() && g_fr_economy.GetBool())
+	{
+		if (pl->GetMoney() > 0)
+		{
+			pl->RemoveMoney(1);
+		}
+
+		if (pl->GetMoney() <= 0)
+		{
+			if (m_flSoundTime <= gpGlobals->curtime)
+			{
+				m_flSoundTime = gpGlobals->curtime + 0.62;
+				EmitSound("SuitRecharge.Deny");
+			}
+			return;
+		}
 	}
 
 	SetNextThink( gpGlobals->curtime + 0.25 );
@@ -329,10 +350,8 @@ void CRecharge::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE use
 		EmitSound( filter, entindex(), "SuitRecharge.ChargingLoop" );
 	}
 
-	CBasePlayer *pl = (CBasePlayer *) m_hActivator.Get();
-
 	// charge the player
-	int nMaxArmor = 100;
+	int nMaxArmor = pl->GetMaxArmorValue();
 	int nIncrementArmor = 1;
 	if ( HasSpawnFlags(	SF_CITADEL_RECHARGER ) )
 	{
@@ -697,6 +716,8 @@ void CNewRecharge::InputRecharge( inputdata_t &inputdata )
 
 void CNewRecharge::InputSetCharge( inputdata_t &inputdata )
 {
+	ResetSequence( LookupSequence( "idle" ) );
+
 	int iJuice = inputdata.value.Int();
 
 	m_flJuice = m_iMaxJuice = m_iJuice = iJuice;
@@ -777,8 +798,26 @@ void CNewRecharge::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE 
 		return;
 	}
 
+	if (sk_suitcharger_usesmoney.GetBool() && g_fr_economy.GetBool())
+	{
+		if (pPlayer->GetMoney() > 0)
+		{
+			pPlayer->RemoveMoney(1);
+		}
+
+		if (pPlayer->GetMoney() <= 0)
+		{
+			if (m_flSoundTime <= gpGlobals->curtime)
+			{
+				m_flSoundTime = gpGlobals->curtime + 0.62;
+				EmitSound("SuitRecharge.Deny");
+			}
+			return;
+		}
+	}
+
 	// Get our maximum armor value
-	int nMaxArmor = 100;
+	int nMaxArmor = pPlayer->GetMaxArmorValue();
 	if ( HasSpawnFlags(	SF_CITADEL_RECHARGER ) )
 	{
 		nMaxArmor = sk_suitcharger_citadel_maxarmor.GetInt();

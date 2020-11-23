@@ -11,6 +11,7 @@
 #include "c_ai_basenpc.h"
 #include "in_buttons.h"
 #include "collisionutils.h"
+#include "firefightreloaded/fr_ragdoll.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -27,10 +28,12 @@ extern ConVar sensitivity;
 
 ConVar cl_npc_speedmod_intime( "cl_npc_speedmod_intime", "0.25", FCVAR_CLIENTDLL | FCVAR_ARCHIVE );
 ConVar cl_npc_speedmod_outtime( "cl_npc_speedmod_outtime", "1.5", FCVAR_CLIENTDLL | FCVAR_ARCHIVE );
+static ConVar cl_playermodel("cl_playermodel", "models/player/playermodels/gordon.mdl", FCVAR_USERINFO | FCVAR_ARCHIVE | FCVAR_SERVER_CAN_EXECUTE, "Default Player Model");
 
 IMPLEMENT_CLIENTCLASS_DT(C_BaseHLPlayer, DT_HL2_Player, CHL2_Player)
 	RecvPropDataTable( RECVINFO_DT(m_HL2Local),0, &REFERENCE_RECV_TABLE(DT_HL2Local) ),
 	RecvPropBool( RECVINFO( m_fIsSprinting ) ),
+	RecvPropEHandle(RECVINFO(m_hRagdoll)),
 END_RECV_TABLE()
 
 BEGIN_PREDICTION_DATA( C_BaseHLPlayer )
@@ -107,7 +110,7 @@ float C_BaseHLPlayer::GetFOV()
 	float flFOVOffset = BaseClass::GetFOV() + GetZoom();
 
 	// Clamp FOV in MP
-	int min_fov = ( gpGlobals->maxClients == 1 ) ? 5 : default_fov.GetInt();
+	int min_fov = GetMinFOV();
 	
 	// Don't let it go too low
 	flFOVOffset = MAX( min_fov, flFOVOffset );
@@ -655,5 +658,139 @@ void C_BaseHLPlayer::BuildTransformations( CStudioHdr *hdr, Vector *pos, Quatern
 {
 	BaseClass::BuildTransformations( hdr, pos, q, cameraTransform, boneMask, boneComputed );
 	BuildFirstPersonMeathookTransformations( hdr, pos, q, cameraTransform, boneMask, boneComputed, "ValveBiped.Bip01_Head1" );
+}
+
+const QAngle& C_BaseHLPlayer::GetRenderAngles()
+{
+	if (IsRagdoll())
+	{
+		return vec3_angle;
+	}
+	else
+	{
+		return BaseClass::GetRenderAngles();
+	}
+}
+
+C_BaseAnimating *C_BaseHLPlayer::BecomeRagdollOnClient()
+{
+	// Let the C_CSRagdoll entity do this.
+	// m_builtRagdoll = true;
+	return NULL;
+}
+
+bool C_BaseHLPlayer::ShouldDraw(void)
+{
+	// If we're dead, our ragdoll will be drawn for us instead.
+	if (!IsAlive())
+		return false;
+
+	//	if( GetTeamNumber() == TEAM_SPECTATOR )
+	//		return false;
+
+	if (IsLocalPlayer() && IsRagdoll())
+		return true;
+
+	if (IsRagdoll())
+		return false;
+
+	return BaseClass::ShouldDraw();
+}
+
+void C_BaseHLPlayer::CalcView(Vector &eyeOrigin, QAngle &eyeAngles, float &zNear, float &zFar, float &fov)
+{
+	if (m_lifeState != LIFE_ALIVE && !IsObserver())
+	{
+		Vector origin = EyePosition();
+
+		IRagdoll *pRagdoll = GetRepresentativeRagdoll();
+
+		if (pRagdoll)
+		{
+			origin = pRagdoll->GetRagdollOrigin();
+			origin.z += VEC_DEAD_VIEWHEIGHT_SCALED(this).z; // look over ragdoll, not through
+		}
+
+		BaseClass::CalcView(eyeOrigin, eyeAngles, zNear, zFar, fov);
+
+		eyeOrigin = origin;
+
+		Vector vForward;
+		AngleVectors(eyeAngles, &vForward);
+
+		VectorNormalize(vForward);
+		VectorMA(origin, -CHASE_CAM_DISTANCE_MAX, vForward, eyeOrigin);
+
+		Vector WALL_MIN(-WALL_OFFSET, -WALL_OFFSET, -WALL_OFFSET);
+		Vector WALL_MAX(WALL_OFFSET, WALL_OFFSET, WALL_OFFSET);
+
+		trace_t trace; // clip against world
+		C_BaseEntity::PushEnableAbsRecomputations(false); // HACK don't recompute positions while doing RayTrace
+		UTIL_TraceHull(origin, eyeOrigin, WALL_MIN, WALL_MAX, MASK_SOLID_BRUSHONLY, this, COLLISION_GROUP_NONE, &trace);
+		C_BaseEntity::PopEnableAbsRecomputations();
+
+		if (trace.fraction < 1.0)
+		{
+			eyeOrigin = trace.endpos;
+		}
+
+		fov = GetFOV();
+
+		return;
+	}
+
+	BaseClass::CalcView(eyeOrigin, eyeAngles, zNear, zFar, fov);
+	fov = GetFOV();
+}
+
+//-----------------------------------------------------------------------------
+// Should this object receive shadows?
+//-----------------------------------------------------------------------------
+bool C_BaseHLPlayer::ShouldReceiveProjectedTextures(int flags)
+{
+	Assert(flags & SHADOW_FLAGS_PROJECTED_TEXTURE_TYPE_MASK);
+
+	if (IsEffectActive(EF_NODRAW))
+		return false;
+
+	if (flags & SHADOW_FLAGS_FLASHLIGHT)
+	{
+		return true;
+	}
+
+	return BaseClass::ShouldReceiveProjectedTextures(flags);
+}
+
+void C_BaseHLPlayer::DoImpactEffect(trace_t &tr, int nDamageType)
+{
+	if (GetActiveWeapon())
+	{
+		GetActiveWeapon()->DoImpactEffect(tr, nDamageType);
+		return;
+	}
+
+	BaseClass::DoImpactEffect(tr, nDamageType);
+}
+
+ShadowType_t C_BaseHLPlayer::ShadowCastType(void)
+{
+	if (!IsVisible())
+		return SHADOWS_NONE;
+
+	return SHADOWS_RENDER_TO_TEXTURE_DYNAMIC;
+}
+
+IRagdoll* C_BaseHLPlayer::GetRepresentativeRagdoll() const
+{
+	if (m_hRagdoll.Get())
+	{
+		C_FRRagdoll_Player *pRagdoll = (C_FRRagdoll_Player*)m_hRagdoll.Get();
+
+		return pRagdoll->GetIRagdoll();
+	}
+	else
+	{
+		return NULL;
+	}
 }
 

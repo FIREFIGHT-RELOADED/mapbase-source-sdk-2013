@@ -941,7 +941,7 @@ void CNPC_Alyx::AnalyzeGunfireSound( CSound *pSound )
 
 	CBaseEntity *pSoundTarget = pSound->m_hTarget.Get();
 
-	CBasePlayer *pPlayer = AI_GetSinglePlayer();
+	CBaseEntity *pPlayer = UTIL_GetNearestPlayer(GetAbsOrigin());
 
 	Assert( pPlayer != NULL );
 
@@ -1089,7 +1089,7 @@ void CNPC_Alyx::EnemyIgnited( CAI_BaseNPC *pVictim )
 //-----------------------------------------------------------------------------
 void CNPC_Alyx::CombineBallSocketed( int iNumBounces )
 {
-	CBasePlayer *pPlayer = AI_GetSinglePlayer();
+	CBaseEntity *pPlayer = UTIL_GetNearestPlayer(GetAbsOrigin());
 	
 	if ( !pPlayer || !FVisible(pPlayer) )
 	{
@@ -1235,7 +1235,7 @@ void CNPC_Alyx::DoCustomSpeechAI( void )
 {
 	BaseClass::DoCustomSpeechAI();
 
-	CBasePlayer *pPlayer = AI_GetSinglePlayer();
+	CBasePlayer *pPlayer = UTIL_GetNearestPlayer(GetAbsOrigin());
 
 	if ( HasCondition(COND_NEW_ENEMY) && GetEnemy() )
 	{
@@ -1359,7 +1359,7 @@ void CNPC_Alyx::DoCustomSpeechAI( void )
 			{
 				m_SpeechWatch_LostPlayer.Set( 5,8 );
 				m_SpeechWatch_LostPlayer.Start();
-				m_MoveMonitor.SetMark( AI_GetSinglePlayer(), 48 );
+				m_MoveMonitor.SetMark(UTIL_GetNearestPlayer(GetAbsOrigin()), 48);
 			}
 			else if ( m_SpeechWatch_LostPlayer.Expired() )
 			{
@@ -1368,7 +1368,7 @@ void CNPC_Alyx::DoCustomSpeechAI( void )
 					( !pPlayer || pPlayer->GetAbsOrigin().DistToSqr(GetAbsOrigin()) > ALYX_DARKNESS_LOST_PLAYER_DIST ) )
 				{
 					// only speak if player hasn't moved.
-					if ( m_MoveMonitor.TargetMoved( AI_GetSinglePlayer() ) )
+					if (m_MoveMonitor.TargetMoved(UTIL_GetNearestPlayer(GetAbsOrigin())))
 					{
 						SpeakIfAllowed( "TLK_DARKNESS_LOSTPLAYER" );
 						m_SpeechWatch_LostPlayer.Set(10);
@@ -2506,6 +2506,9 @@ bool CNPC_Alyx::IsAllowedToAim()
 //-----------------------------------------------------------------------------
 void CNPC_Alyx::PainSound( const CTakeDamageInfo &info )
 {
+	if (IsOnFire())
+		return;
+
 	// Alex has specific sounds for when attacked in the dark
 	if ( !HasCondition( COND_ALYX_IN_DARK ) )
 	{
@@ -2520,6 +2523,9 @@ void CNPC_Alyx::PainSound( const CTakeDamageInfo &info )
 
 void CNPC_Alyx::DeathSound( const CTakeDamageInfo &info )
 {
+	if (IsOnFire())
+		return;
+
 	// Sentences don't play on dead NPCs
 	SentenceStop();
 
@@ -3204,6 +3210,9 @@ void CNPC_Alyx::OnUpdateShotRegulator( )
 //-----------------------------------------------------------------------------
 void CNPC_Alyx::BarnacleDeathSound( void )
 {
+	if (IsOnFire())
+		return;
+
 	Speak( TLK_SELF_IN_BARNACLE );
 }
 
@@ -3387,7 +3396,7 @@ void CNPC_Alyx::InputVehiclePunted( inputdata_t &inputdata )
 //-----------------------------------------------------------------------------
 void CNPC_Alyx::InputOutsideTransition( inputdata_t &inputdata )
 {
-	CBasePlayer *pPlayer = AI_GetSinglePlayer();
+	CBasePlayer *pPlayer = UTIL_GetNearestPlayer(GetAbsOrigin());
 	if ( pPlayer && pPlayer->IsInAVehicle() )
 	{
 		if ( ShouldAlwaysTransition() == false )

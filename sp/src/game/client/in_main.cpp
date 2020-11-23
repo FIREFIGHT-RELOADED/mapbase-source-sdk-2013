@@ -143,6 +143,10 @@ static	kbutton_t	in_zoom;
 static  kbutton_t   in_grenade1;
 static  kbutton_t   in_grenade2;
 static	kbutton_t	in_attack3;
+static	kbutton_t	in_kick;
+static	kbutton_t	in_ironsight;
+static	kbutton_t	in_bullettime;
+static	kbutton_t	in_grapple;
 kbutton_t	in_ducktoggle;
 
 /*
@@ -490,6 +494,14 @@ void IN_Grenade2Down( const CCommand &args ) { KeyDown( &in_grenade2, args[1] );
 void IN_XboxStub( const CCommand &args ) { /*do nothing*/ }
 void IN_Attack3Down( const CCommand &args ) { KeyDown(&in_attack3, args[1] );}
 void IN_Attack3Up( const CCommand &args ) { KeyUp(&in_attack3, args[1] );}
+void IN_KickDown(const CCommand &args) { KeyDown(&in_kick, args[1]); }
+void IN_KickUp(const CCommand &args) { KeyUp(&in_kick, args[1]); }
+void IN_IronsightDown(const CCommand &args) { KeyDown(&in_ironsight, args[1]); }
+void IN_IronsightUp(const CCommand &args) { KeyUp(&in_ironsight, args[1]); }
+void IN_BullettimeDown(const CCommand &args) { KeyDown(&in_bullettime, args[1]); }
+void IN_BullettimeUp(const CCommand &args) { KeyUp(&in_bullettime, args[1]); }
+void IN_GrappleDown(const CCommand &args) { KeyDown(&in_grapple, args[1]); }
+void IN_GrappleUp(const CCommand &args) { KeyUp(&in_grapple, args[1]); }
 
 void IN_DuckToggle( const CCommand &args ) 
 { 
@@ -1472,6 +1484,10 @@ int CInput::GetButtonBits( int bResetState )
 	CalcButtonBits( bits, IN_GRENADE1, s_ClearInputState, &in_grenade1, bResetState );
 	CalcButtonBits( bits, IN_GRENADE2, s_ClearInputState, &in_grenade2, bResetState );
 	CalcButtonBits( bits, IN_ATTACK3, s_ClearInputState, &in_attack3, bResetState );
+	CalcButtonBits(bits, IN_KICK, s_ClearInputState, &in_kick, bResetState);
+	CalcButtonBits(bits, IN_IRONSIGHT, s_ClearInputState, &in_ironsight, bResetState);
+	CalcButtonBits(bits, IN_BULLETTIME, s_ClearInputState, &in_bullettime, bResetState);
+	CalcButtonBits(bits, IN_GRAPPLE, s_ClearInputState, &in_grapple, bResetState);
 
 	if ( KeyState(&in_ducktoggle) )
 	{
@@ -1629,6 +1645,14 @@ static ConCommand endgrenade2( "-grenade2", IN_Grenade2Up );
 static ConCommand startgrenade2( "+grenade2", IN_Grenade2Down );
 static ConCommand startattack3("+attack3", IN_Attack3Down);
 static ConCommand endattack3("-attack3", IN_Attack3Up);
+static ConCommand startkick("+kick", IN_KickDown);
+static ConCommand endkick("-kick", IN_KickUp);
+static ConCommand startironsight("+ironsight", IN_IronsightDown);
+static ConCommand endironsight("-ironsight", IN_IronsightUp);
+static ConCommand startbullettime("+bullettime", IN_BullettimeDown);
+static ConCommand endbullettime("-bullettime", IN_BullettimeUp);
+static ConCommand startgrapple("+grapple", IN_GrappleDown);
+static ConCommand endgrapple("-grapple", IN_GrappleUp);
 
 #ifdef TF_CLIENT_DLL
 static ConCommand toggle_duck( "toggle_duck", IN_DuckToggle );

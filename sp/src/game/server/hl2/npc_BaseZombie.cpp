@@ -159,6 +159,8 @@ ConVar zombie_decaymax( "zombie_decaymax", "0.4" );
 
 ConVar zombie_ambushdist( "zombie_ambushdist", "16000" );
 
+ConVar zombie_headcrabless_damage("zombie_headcrabless_damage", "1", FCVAR_ARCHIVE);
+
 //=========================================================
 // For a couple of reasons, we keep a running count of how
 // many zombies in the world are angry at any given time.
@@ -668,27 +670,56 @@ int CNPC_BaseZombie::MeleeAttack1Conditions ( float flDot, float flDist )
 #define ZOMBIE_BUCKSHOT_TRIPLE_DAMAGE_DIST	96.0f // Triple damage from buckshot at 8 feet (headshot only)
 float CNPC_BaseZombie::GetHitgroupDamageMultiplier( int iHitGroup, const CTakeDamageInfo &info )
 {
-	switch( iHitGroup )
+		switch( iHitGroup )
 	{
 	case HITGROUP_HEAD:
 		{
-			if( info.GetDamageType() & DMG_BUCKSHOT )
+			int HeadshotRandom = random->RandomInt(0, 4);
+			if (!(g_Language.GetInt() == LANGUAGE_GERMAN || UTIL_IsLowViolence()) && g_fr_headshotgore.GetBool())
 			{
-				float flDist = FLT_MAX;
-
-				if( info.GetAttacker() )
+				if (!m_fIsHeadless && HeadshotRandom == 0 && !(info.GetDamageType() & DMG_NEVERGIB) && !FClassnameIs(this, "npc_poisonzombie") || !m_fIsHeadless && info.GetDamageType() & DMG_SNIPER && !(info.GetDamageType() & DMG_NEVERGIB) && !FClassnameIs(this, "npc_poisonzombie"))
 				{
-					flDist = ( GetAbsOrigin() - info.GetAttacker()->GetAbsOrigin() ).Length();
+					DispatchParticleEffect("smod_headshot_y", PATTACH_POINT_FOLLOW, this, "headcrab", true);
+					CGib::SpawnSpecificGibs(this, 3, 750, 1500, "models/gibs/agib_p3.mdl", 6);
+					CGib::SpawnSpecificGibs(this, 3, 750, 1500, "models/gibs/agib_p4.mdl", 6);
+					EmitSound("Gore.Headshot");
+					g_pGameRules->iHeadshotCount += 1;
+					RemoveHead();
+					CBasePlayer *pPlayer = UTIL_PlayerByIndex(1);
+					if (g_fr_economy.GetBool())
+					{
+						pPlayer->AddMoney(2);
+					}
+					if (!g_fr_classic.GetBool())
+					{
+						pPlayer->AddXP(4);
+					}
 				}
-
-				if( flDist <= ZOMBIE_BUCKSHOT_TRIPLE_DAMAGE_DIST )
+				else
 				{
-					return 3.0f;
+					return 2.0f;
 				}
 			}
 			else
 			{
-				return 2.0f;
+				if (info.GetDamageType() & DMG_BUCKSHOT)
+				{
+					float flDist = FLT_MAX;
+
+					if (info.GetAttacker())
+					{
+						flDist = (GetAbsOrigin() - info.GetAttacker()->GetAbsOrigin()).Length();
+					}
+
+					if (flDist <= ZOMBIE_BUCKSHOT_TRIPLE_DAMAGE_DIST)
+					{
+						return 3.0f;
+					}
+				}
+				else
+				{
+					return 2.0f;
+				}
 			}
 		}
 	}
@@ -754,6 +785,11 @@ bool CNPC_BaseZombie::ShouldBecomeTorso( const CTakeDamageInfo &info, float flDa
 		return true;
 	}
 
+	if (info.GetDamageType() & DMG_BURN)
+	{
+		return false;
+	}
+
 	if ( hl2_episodic.GetBool() )
 	{
 		// Always split after a cannon hit
@@ -787,7 +823,10 @@ HeadcrabRelease_t CNPC_BaseZombie::ShouldReleaseHeadcrab( const CTakeDamageInfo 
 	if ( m_iHealth <= 0 )
 #endif
 	{
-		if ( info.GetDamageType() & DMG_REMOVENORAGDOLL )
+		if (m_fIsHeadless)
+			return RELEASE_NO;
+
+		if (info.GetDamageType() & DMG_REMOVENORAGDOLL && !FClassnameIs(this, "npc_zombine"))
 			return RELEASE_NO;
 
 		if ( info.GetDamageType() & DMG_SNIPER )
@@ -929,8 +968,17 @@ int CNPC_BaseZombie::OnTakeDamage_Alive( const CTakeDamageInfo &inputInfo )
 
 			if ( CanBecomeLiveTorso() )
 			{
-				BecomeTorso( vec3_origin, inputInfo.GetDamageForce() * 0.50 );
+				if (!(info.GetDamageType() & (DMG_CLUB | DMG_DISSOLVE | DMG_NEVERGIB)))
+				{
+					BecomeTorso( vec3_origin, inputInfo.GetDamageForce() * 0.50 );
+					if (!(g_Language.GetInt() == LANGUAGE_GERMAN || UTIL_IsLowViolence()))
+					{
+						UTIL_BloodSpray(WorldSpaceCenter(), vec3_origin, BLOOD_COLOR_YELLOW, 13, FX_BLOODSPRAY_ALL);
+						DispatchParticleEffect("blood_zombie_split", GetAbsOrigin(), GetAbsAngles(), this);
+					}
+				}
 
+				//why not uncomment this code!
 				if ( ( info.GetDamageType() & DMG_BLAST) && random->RandomInt( 0, 1 ) == 0 )
 				{
 					Ignite( 5.0 + random->RandomFloat( 0.0, 5.0 ) );
@@ -945,6 +993,7 @@ int CNPC_BaseZombie::OnTakeDamage_Alive( const CTakeDamageInfo &inputInfo )
 						Ignite( 5.0f + random->RandomFloat( 0.0f, 5.0f ) );
 					}
 				}
+
 
 				if (flDamageThreshold >= 1.0)
 				{
@@ -1057,6 +1106,11 @@ void CNPC_BaseZombie::MoanSound( envelopePoint_t *pEnvelope, int iEnvelopeSize )
 //-----------------------------------------------------------------------------
 bool CNPC_BaseZombie::IsChopped( const CTakeDamageInfo &info )
 {
+	//if we are damaged by a katana, return true.
+	if (info.GetDamageType() & DMG_SLASH)
+		return true;
+
+	/*
 	float flDamageThreshold = MIN( 1, info.GetDamage() / m_iMaxHealth );
 
 	if ( m_iHealth > 0 || flDamageThreshold <= 0.5 )
@@ -1066,7 +1120,7 @@ bool CNPC_BaseZombie::IsChopped( const CTakeDamageInfo &info )
 		return false;
 
 	if ( !( info.GetDamageType() & DMG_CRUSH) )
-		return false;
+		return false;*/
 
 	if ( info.GetDamageType() & DMG_REMOVENORAGDOLL )
 		return false;
@@ -1254,7 +1308,12 @@ void CNPC_BaseZombie::DieChopped( const CTakeDamageInfo &info )
 
 			UTIL_BloodImpact( vecSpot, vecDir, BloodColor(), 1 );
 		}
+		
+		DispatchParticleEffect("blood_zombie_split", GetAbsOrigin(), GetAbsAngles(), this);
 	}
+
+	m_iHealth = 0;
+	Event_Killed(info);
 }
 
 //-----------------------------------------------------------------------------
@@ -2160,8 +2219,16 @@ void CNPC_BaseZombie::PrescheduleThink( void )
 	{
 		m_flBurnDamage = 0;
 	}
-}
 
+	// if our crab is shot off, we will lose health based on difficulty
+	if (m_fIsHeadless && zombie_headcrabless_damage.GetBool())
+	{
+		int HeadshotDMGRandom = random->RandomInt(1, 5);
+		CTakeDamageInfo info(this, this, HeadshotDMGRandom, DMG_CLUB);
+		BaseClass::TakeDamage(info);
+		UTIL_BloodImpact(WorldSpaceCenter(), vec3_origin, BloodColor(), 5);
+	}
+}
 
 //---------------------------------------------------------
 //---------------------------------------------------------
@@ -2387,6 +2454,14 @@ void CNPC_BaseZombie::Event_Killed( const CTakeDamageInfo &info )
 		UTIL_BloodSpray( WorldSpaceCenter(), vecDamageDir, BLOOD_COLOR_YELLOW, 8, FX_BLOODSPRAY_CLOUD );
 	}
 
+	if (!(g_Language.GetInt() == LANGUAGE_GERMAN || UTIL_IsLowViolence()) && info.GetDamageType() & (DMG_ALWAYSGIB | DMG_BLAST | DMG_CRUSH) && !(info.GetDamageType() & (DMG_NEVERGIB | DMG_DISSOLVE)) && !m_fIsTorso && !FClassnameIs(this, "npc_poisonzombie"))
+	{
+		DieChopped(info);
+		Vector vecDamageDir = info.GetDamageForce();
+		VectorNormalize(vecDamageDir);
+		UTIL_BloodSpray(WorldSpaceCenter(), vecDamageDir, BLOOD_COLOR_YELLOW, 13, FX_BLOODSPRAY_ALL);
+	}
+
    	BaseClass::Event_Killed( info );
 }
 
@@ -2482,7 +2557,7 @@ bool CNPC_BaseZombie::HeadcrabFits( CBaseAnimating *pCrab )
 //			fRemoveHead - 
 //			fRagdollBody - 
 //-----------------------------------------------------------------------------
-void CNPC_BaseZombie::ReleaseHeadcrab( const Vector &vecOrigin, const Vector &vecVelocity, bool fRemoveHead, bool fRagdollBody, bool fRagdollCrab )
+void CNPC_BaseZombie::ReleaseHeadcrab(const Vector &vecOrigin, const Vector &vecVelocity, bool fRemoveHead, bool fRagdollBody, bool fRagdollCrab, bool fRemoveRagdollCrab)
 {
 	CAI_BaseNPC		*pCrab;
 	Vector vecSpot = vecOrigin;
@@ -2525,7 +2600,7 @@ void CNPC_BaseZombie::ReleaseHeadcrab( const Vector &vecOrigin, const Vector &ve
 				SetHeadcrabSpawnLocation( iCrabAttachment, pAnimatingGib );
 			}
 
-			if( !HeadcrabFits(pAnimatingGib) )
+			if (!HeadcrabFits(pAnimatingGib) || fRemoveRagdollCrab)
 			{
 				UTIL_Remove(pGib);
 				return;

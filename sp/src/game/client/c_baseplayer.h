@@ -60,6 +60,7 @@ public:
 
 #define CHASE_CAM_DISTANCE_MIN	16.0f
 #define CHASE_CAM_DISTANCE_MAX	96.0f
+#define CHASE_CAM_DISTANCE		96.0f
 #define WALL_OFFSET				6.0f
 
 
@@ -207,7 +208,7 @@ public:
 
 	virtual bool				ShouldReceiveProjectedTextures( int flags )
 	{
-		return false;
+		return true;
 	}
 
 
@@ -398,6 +399,12 @@ public:
 
 	virtual bool			CanUseFirstPersonCommand( void ){ return true; }
 	
+	int GetXP()				{ return m_iExp; }
+	int GetMaxXP()				{ return m_iMaxExp; }
+	int GetLevel()			{ return m_iLevel; }
+	int	FragCount() const		{ return m_iFrags; }
+	int GetMoney()			{ return m_iMoney; }
+	
 protected:
 	fogparams_t				m_CurrentFog;
 	EHANDLE					m_hOldFogController;
@@ -442,6 +449,7 @@ public:
 	float			m_flConstraintRadius;
 	float			m_flConstraintWidth;
 	float			m_flConstraintSpeedFactor;
+	int				m_iPerkInfiniteAmmo;
 
 #ifdef MAPBASE
 	// Transmitted from the server for internal player spawnflags.
@@ -593,6 +601,10 @@ private:
 	float m_flAvoidanceForward;
 	float m_flAvoidanceDotForward;
 	float m_flAvoidanceDotRight;
+
+	int m_iExp, m_iLevel, m_iMaxExp;
+	int m_iFrags;
+	int m_iMoney;
 
 protected:
 	virtual bool IsDucked( void ) const { return m_Local.m_bDucked; }

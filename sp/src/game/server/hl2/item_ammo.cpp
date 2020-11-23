@@ -15,6 +15,16 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
+ConVar	sk_customammo_normal_count("sk_customammo_normal_count", "45");
+ConVar	sk_customammo_buckshot_count("sk_customammo_buckshot_count", "20");
+ConVar	sk_customammo_sniper_count("sk_customammo_sniper_count", "15");
+ConVar	sk_customammo_buckshotsniper_count("sk_customammo_buckshotsniper_count", "10");
+
+ConVar	sk_customammo_normal_model("sk_customammo_normal_model", "");
+ConVar	sk_customammo_buckshot_model("sk_customammo_buckshot_model", "");
+ConVar	sk_customammo_sniper_model("sk_customammo_sniper_model", "");
+ConVar	sk_customammo_buckshotsniper_model("sk_customammo_buckshotsniper_model", "");
+
 #ifdef MAPBASE
 // ========================================================================
 //	>> CItemAmmo
@@ -53,6 +63,50 @@ public:
 		}
 
 		return pPlayer->GiveAmmo( flCount, iAmmoType, bSuppressSound );
+	}
+	
+	void GiveCustomWeaponAmmo(CBasePlayer *pPlayer, int mode)
+	{
+		if (mode == 1)
+		{
+			ITEM_GiveAmmo(pPlayer, sk_customammo_normal_count.GetFloat(), "CustomBullet1_Normal");
+			ITEM_GiveAmmo(pPlayer, sk_customammo_normal_count.GetFloat(), "CustomBullet2_NormalBurn");
+			ITEM_GiveAmmo(pPlayer, sk_customammo_normal_count.GetFloat(), "CustomBullet3_NormalBurnGib");
+			ITEM_GiveAmmo(pPlayer, sk_customammo_normal_count.GetFloat(), "CustomBullet4_NormalAlwaysGib");
+			ITEM_GiveAmmo(pPlayer, sk_customammo_normal_count.GetFloat(), "CustomBullet5_NormalDissolve");
+			ITEM_GiveAmmo(pPlayer, sk_customammo_normal_count.GetFloat(), "CustomBullet6_NormalDissolveGib");
+			ITEM_GiveAmmo(pPlayer, sk_customammo_normal_count.GetFloat(), "CustomBullet25_NormalKnockback");
+		}
+		else if (mode == 2)
+		{
+			ITEM_GiveAmmo(pPlayer, sk_customammo_buckshot_count.GetFloat(), "CustomBullet7_Buckshot");
+			ITEM_GiveAmmo(pPlayer, sk_customammo_buckshot_count.GetFloat(), "CustomBullet8_BuckshotBurn");
+			ITEM_GiveAmmo(pPlayer, sk_customammo_buckshot_count.GetFloat(), "CustomBullet9_BuckshotBurnGib");
+			ITEM_GiveAmmo(pPlayer, sk_customammo_buckshot_count.GetFloat(), "CustomBullet10_BuckshotAlwaysGib");
+			ITEM_GiveAmmo(pPlayer, sk_customammo_buckshot_count.GetFloat(), "CustomBullet11_BuckshotDissolve");
+			ITEM_GiveAmmo(pPlayer, sk_customammo_buckshot_count.GetFloat(), "CustomBullet12_BuckshotDissolveGib");
+			ITEM_GiveAmmo(pPlayer, sk_customammo_buckshot_count.GetFloat(), "CustomBullet26_BuckshotKnockback");
+		}
+		else if (mode == 3)
+		{
+			ITEM_GiveAmmo(pPlayer, sk_customammo_sniper_count.GetFloat(), "CustomBullet13_Sniper");
+			ITEM_GiveAmmo(pPlayer, sk_customammo_sniper_count.GetFloat(), "CustomBullet14_SniperBurn");
+			ITEM_GiveAmmo(pPlayer, sk_customammo_sniper_count.GetFloat(), "CustomBullet15_SniperBurnGib");
+			ITEM_GiveAmmo(pPlayer, sk_customammo_sniper_count.GetFloat(), "CustomBullet16_SniperAlwaysGib");
+			ITEM_GiveAmmo(pPlayer, sk_customammo_sniper_count.GetFloat(), "CustomBullet17_SniperDissolve");
+			ITEM_GiveAmmo(pPlayer, sk_customammo_sniper_count.GetFloat(), "CustomBullet18_SniperDissolveGib");
+			ITEM_GiveAmmo(pPlayer, sk_customammo_sniper_count.GetFloat(), "CustomBullet27_SniperKnockback");
+		}
+		else if (mode == 4)
+		{
+			ITEM_GiveAmmo(pPlayer, sk_customammo_buckshotsniper_count.GetFloat(), "CustomBullet19_BuckshotSniper");
+			ITEM_GiveAmmo(pPlayer, sk_customammo_buckshotsniper_count.GetFloat(), "CustomBullet20_BuckshotSniperBurn");
+			ITEM_GiveAmmo(pPlayer, sk_customammo_buckshotsniper_count.GetFloat(), "CustomBullet21_BuckshotSniperBurnGib");
+			ITEM_GiveAmmo(pPlayer, sk_customammo_buckshotsniper_count.GetFloat(), "CustomBullet22_BuckshotSniperAlwaysGib");
+			ITEM_GiveAmmo(pPlayer, sk_customammo_buckshotsniper_count.GetFloat(), "CustomBullet23_BuckshotSniperDissolve");
+			ITEM_GiveAmmo(pPlayer, sk_customammo_buckshotsniper_count.GetFloat(), "CustomBullet24_BuckshotSniperDissolveGib");
+			ITEM_GiveAmmo(pPlayer, sk_customammo_buckshotsniper_count.GetFloat(), "CustomBullet28_BuckshotSniperKnockback");
+		}
 	}
 
 	void	InputSetAmmoMultiplier( inputdata_t &inputdata ) { m_flAmmoMultiplier = inputdata.value.Float(); }
@@ -442,7 +496,7 @@ LINK_ENTITY_TO_CLASS(item_flare_round, CItem_FlareRound);
 // ========================================================================
 //	>> BoxFlareRounds
 // ========================================================================
-#define SIZE_BOX_FLARE_ROUNDS 5
+#define SIZE_BOX_FLARE_ROUNDS 15
 
 class CItem_BoxFlareRounds : public CItem
 {
@@ -647,6 +701,473 @@ public:
 };
 
 LINK_ENTITY_TO_CLASS( item_ammo_ar2_altfire, CItem_AR2AltFireRound );
+
+// ========================================================================
+//	>> AmmoGrenade
+// ========================================================================
+class CItem_AmmoGrenade : public CItem
+{
+public:
+	DECLARE_CLASS(CItem_AmmoGrenade, CItem);
+
+	void Spawn(void)
+	{
+		Precache();
+		SetModel("models/items/grenadeammo.mdl");
+		BaseClass::Spawn();
+	}
+	void Precache(void)
+	{
+		PrecacheModel("models/items/grenadeammo.mdl");
+	}
+	bool MyTouch(CBasePlayer *pPlayer)
+	{
+		if (pPlayer->HasNamedPlayerItem("weapon_frag"))
+		{
+			if (ITEM_GiveAmmo(pPlayer, SIZE_AMMO_GRENADE, "Grenade"))
+			{
+				if (g_pGameRules->ItemShouldRespawn(this) == GR_ITEM_RESPAWN_NO)
+				{
+					UTIL_Remove(this);
+				}
+
+				return true;
+			}
+		}
+		else
+		{
+			pPlayer->GiveNamedItem("weapon_frag");
+
+			if (g_pGameRules->ItemShouldRespawn(this) == GR_ITEM_RESPAWN_NO)
+			{
+				UTIL_Remove(this);
+			}
+
+			return true;
+		}
+		return false;
+	}
+};
+LINK_ENTITY_TO_CLASS(item_ammo_grenade, CItem_AmmoGrenade);
+
+class CItem_BoxSniperRifle : public CItem
+{
+public:
+	DECLARE_CLASS(CItem_BoxSniperRifle, CItem);
+
+	void Spawn(void)
+	{
+		Precache();
+		SetModel("models/items/boxsniperrounds.mdl");
+		BaseClass::Spawn();
+	}
+	void Precache(void)
+	{
+		PrecacheModel("models/items/boxsniperrounds.mdl");
+	}
+	bool MyTouch(CBasePlayer *pPlayer)
+	{
+		if (ITEM_GiveAmmo(pPlayer, SIZE_AMMO_SNIPER, "Sniper"))
+		{
+			if (g_pGameRules->ItemShouldRespawn(this) == GR_ITEM_RESPAWN_NO)
+			{
+				UTIL_Remove(this);
+			}
+			return true;
+		}
+		return false;
+	}
+};
+LINK_ENTITY_TO_CLASS(item_ammo_sniperrifle, CItem_BoxSniperRifle);
+
+// ========================================================================
+//	>> BoxSRounds
+// ========================================================================
+class CItem_BoxDeagle : public CItem
+{
+public:
+	DECLARE_CLASS(CItem_BoxDeagle, CItem);
+
+	void Spawn(void)
+	{
+		Precache();
+		SetModel("models/items/boxsrounds.mdl");
+		BaseClass::Spawn();
+	}
+	void Precache(void)
+	{
+		PrecacheModel("models/items/boxsrounds.mdl");
+	}
+	bool MyTouch(CBasePlayer *pPlayer)
+	{
+		if (ITEM_GiveAmmo(pPlayer, SIZE_AMMO_DEAGLE, "Deagle"))
+		{
+			if (g_pGameRules->ItemShouldRespawn(this) == GR_ITEM_RESPAWN_NO)
+			{
+				UTIL_Remove(this);
+			}
+
+			return true;
+		}
+		return false;
+	}
+};
+LINK_ENTITY_TO_CLASS(item_ammo_deagle, CItem_BoxDeagle);
+
+// ========================================================================
+//	>> BoxMRounds
+// ========================================================================
+class CItem_BoxM249 : public CItem
+{
+public:
+	DECLARE_CLASS(CItem_BoxM249, CItem);
+
+	void Spawn(void)
+	{
+		Precache();
+		SetModel("models/items/boxmrounds.mdl");
+		BaseClass::Spawn();
+	}
+	void Precache(void)
+	{
+		PrecacheModel("models/items/boxmrounds.mdl");
+	}
+	bool MyTouch(CBasePlayer *pPlayer)
+	{
+		if (ITEM_GiveAmmo(pPlayer, SIZE_AMMO_M249, "M249"))
+		{
+			if (g_pGameRules->ItemShouldRespawn(this) == GR_ITEM_RESPAWN_NO)
+			{
+				UTIL_Remove(this);
+			}
+			return true;
+		}
+		return false;
+	}
+};
+LINK_ENTITY_TO_CLASS(item_ammo_m249para, CItem_BoxM249);
+
+class CItem_BoxOICW : public CItem
+{
+public:
+	DECLARE_CLASS(CItem_BoxOICW, CItem);
+
+	void Spawn(void)
+	{
+		Precache();
+		SetModel("models/items/boxmrounds.mdl");
+		BaseClass::Spawn();
+	}
+	void Precache(void)
+	{
+		PrecacheModel("models/items/boxmrounds.mdl");
+	}
+	bool MyTouch(CBasePlayer *pPlayer)
+	{
+		if (ITEM_GiveAmmo(pPlayer, SIZE_AMMO_OICW, "OICW"))
+		{
+			if (g_pGameRules->ItemShouldRespawn(this) == GR_ITEM_RESPAWN_NO)
+			{
+				UTIL_Remove(this);
+			}
+			return true;
+		}
+		return false;
+	}
+};
+LINK_ENTITY_TO_CLASS(item_ammo_oicw, CItem_BoxOICW);
+
+class CItem_OICW_Grenade : public CItem
+{
+public:
+	DECLARE_CLASS(CItem_OICW_Grenade, CItem);
+
+	void Spawn(void)
+	{
+		Precache();
+		SetModel("models/items/ar2_grenade.mdl");
+		BaseClass::Spawn();
+	}
+	void Precache(void)
+	{
+		PrecacheModel("models/items/ar2_grenade.mdl");
+	}
+	bool MyTouch(CBasePlayer *pPlayer)
+	{
+		if (ITEM_GiveAmmo(pPlayer, 1, "OICW_Grenade"))
+		{
+			if (g_pGameRules->ItemShouldRespawn(this) == GR_ITEM_RESPAWN_NO)
+			{
+				UTIL_Remove(this);
+			}
+			return true;
+		}
+		return false;
+	}
+};
+LINK_ENTITY_TO_CLASS(item_oicw_grenade, CItem_OICW_Grenade);
+
+class CItem_SLAM_Ammo : public CItem
+{
+public:
+	DECLARE_CLASS(CItem_SLAM_Ammo, CItem);
+
+	void Spawn(void)
+	{
+		Precache();
+		SetModel("models/weapons/w_slam.mdl");
+		BaseClass::Spawn();
+	}
+	void Precache(void)
+	{
+		PrecacheModel("models/weapons/w_slam.mdl");
+	}
+	bool MyTouch(CBasePlayer *pPlayer)
+	{
+		if (pPlayer->HasNamedPlayerItem("weapon_slam"))
+		{
+			if (ITEM_GiveAmmo(pPlayer, 1, "slam"))
+			{
+				if (g_pGameRules->ItemShouldRespawn(this) == GR_ITEM_RESPAWN_NO)
+				{
+					UTIL_Remove(this);
+				}
+
+				return true;
+			}
+		}
+		else
+		{
+			pPlayer->GiveNamedItem("weapon_slam");
+
+			if (g_pGameRules->ItemShouldRespawn(this) == GR_ITEM_RESPAWN_NO)
+			{
+				UTIL_Remove(this);
+			}
+
+			return true;
+		}
+		return false;
+	}
+};
+LINK_ENTITY_TO_CLASS(item_slam_ammo, CItem_SLAM_Ammo);
+
+class CItem_BoxEgon : public CItem
+{
+public:
+	DECLARE_CLASS(CItem_BoxEgon, CItem);
+
+	void Spawn(void)
+	{
+		Precache();
+		SetModel("models/items/boxmrounds.mdl");
+		BaseClass::Spawn();
+	}
+	void Precache(void)
+	{
+		PrecacheModel("models/items/boxmrounds.mdl");
+	}
+	bool MyTouch(CBasePlayer *pPlayer)
+	{
+		if (ITEM_GiveAmmo(pPlayer, SIZE_AMMO_ENERGY, "EgonEnergy"))
+		{
+			if (g_pGameRules->ItemShouldRespawn(this) == GR_ITEM_RESPAWN_NO)
+			{
+				UTIL_Remove(this);
+			}
+			return true;
+		}
+		return false;
+	}
+};
+LINK_ENTITY_TO_CLASS(item_ammo_egon, CItem_BoxEgon);
+
+class CItem_BoxMP5 : public CItem
+{
+public:
+	DECLARE_CLASS(CItem_BoxMP5, CItem);
+
+	void Spawn(void)
+	{
+		Precache();
+		SetModel("models/items/boxmrounds.mdl");
+		BaseClass::Spawn();
+	}
+	void Precache(void)
+	{
+		PrecacheModel("models/items/boxmrounds.mdl");
+	}
+	bool MyTouch(CBasePlayer *pPlayer)
+	{
+		if (ITEM_GiveAmmo(pPlayer, SIZE_AMMO_ENERGY, "MP5Ammo"))
+		{
+			if (g_pGameRules->ItemShouldRespawn(this) == GR_ITEM_RESPAWN_NO)
+			{
+				UTIL_Remove(this);
+			}
+			return true;
+		}
+		return false;
+	}
+};
+LINK_ENTITY_TO_CLASS(item_ammo_mp5, CItem_BoxMP5);
+
+class CItem_BoxGauss : public CItem
+{
+public:
+	DECLARE_CLASS(CItem_BoxGauss, CItem);
+
+	void Spawn(void)
+	{
+		Precache();
+		SetModel("models/items/boxmrounds.mdl");
+		BaseClass::Spawn();
+	}
+	void Precache(void)
+	{
+		PrecacheModel("models/items/boxmrounds.mdl");
+	}
+	bool MyTouch(CBasePlayer *pPlayer)
+	{
+		if (ITEM_GiveAmmo(pPlayer, SIZE_AMMO_ENERGY, "GaussEnergy"))
+		{
+			if (g_pGameRules->ItemShouldRespawn(this) == GR_ITEM_RESPAWN_NO)
+			{
+				UTIL_Remove(this);
+			}
+			return true;
+		}
+		return false;
+	}
+};
+LINK_ENTITY_TO_CLASS(item_ammo_gauss, CItem_BoxGauss);
+
+//custom ammo stuff
+
+class CItem_BoxCustomNormal : public CItem
+{
+public:
+	DECLARE_CLASS(CItem_BoxCustomNormal, CItem);
+
+	void Spawn(void)
+	{
+		Precache();
+		SetModel(sk_customammo_normal_model.GetString());
+		BaseClass::Spawn();
+	}
+	void Precache(void)
+	{
+		PrecacheModel(sk_customammo_normal_model.GetString());
+	}
+	bool MyTouch(CBasePlayer *pPlayer)
+	{
+		if (g_pGameRules->ItemShouldRespawn(this) != GR_ITEM_RESPAWN_NO)
+		{
+			GiveCustomWeaponAmmo(pPlayer, 1);
+			return true;
+		}
+		else
+		{
+			UTIL_Remove(this);
+			return false;
+		}
+	}
+};
+LINK_ENTITY_TO_CLASS(item_ammo_customammo_normal, CItem_BoxCustomNormal);
+
+class CItem_BoxCustomBuckshot : public CItem
+{
+public:
+	DECLARE_CLASS(CItem_BoxCustomBuckshot, CItem);
+
+	void Spawn(void)
+	{
+		Precache();
+		SetModel(sk_customammo_buckshot_model.GetString());
+		BaseClass::Spawn();
+	}
+	void Precache(void)
+	{
+		PrecacheModel(sk_customammo_buckshot_model.GetString());
+	}
+	bool MyTouch(CBasePlayer *pPlayer)
+	{
+		if (g_pGameRules->ItemShouldRespawn(this) != GR_ITEM_RESPAWN_NO)
+		{
+			GiveCustomWeaponAmmo(pPlayer, 2);
+			return true;
+		}
+		else
+		{
+			UTIL_Remove(this);
+			return false;
+		}
+	}
+};
+LINK_ENTITY_TO_CLASS(item_ammo_customammo_buckshot, CItem_BoxCustomBuckshot);
+
+class CItem_BoxCustomSniper : public CItem
+{
+public:
+	DECLARE_CLASS(CItem_BoxCustomSniper, CItem);
+
+	void Spawn(void)
+	{
+		Precache();
+		SetModel(sk_customammo_sniper_model.GetString());
+		BaseClass::Spawn();
+	}
+	void Precache(void)
+	{
+		PrecacheModel(sk_customammo_sniper_model.GetString());
+	}
+	bool MyTouch(CBasePlayer *pPlayer)
+	{
+		if (g_pGameRules->ItemShouldRespawn(this) != GR_ITEM_RESPAWN_NO)
+		{
+			GiveCustomWeaponAmmo(pPlayer, 3);
+			return true;
+		}
+		else
+		{
+			UTIL_Remove(this);
+			return false;
+		}
+	}
+};
+LINK_ENTITY_TO_CLASS(item_ammo_customammo_sniper, CItem_BoxCustomSniper);
+
+class CItem_BoxCustomBuckshotSniper : public CItem
+{
+public:
+	DECLARE_CLASS(CItem_BoxCustomBuckshotSniper, CItem);
+
+	void Spawn(void)
+	{
+		Precache();
+		SetModel(sk_customammo_buckshotsniper_model.GetString());
+		BaseClass::Spawn();
+	}
+	void Precache(void)
+	{
+		PrecacheModel(sk_customammo_buckshotsniper_model.GetString());
+	}
+	bool MyTouch(CBasePlayer *pPlayer)
+	{
+		if (g_pGameRules->ItemShouldRespawn(this) != GR_ITEM_RESPAWN_NO)
+		{
+			GiveCustomWeaponAmmo(pPlayer, 4);
+			return true;
+		}
+		else
+		{
+			UTIL_Remove(this);
+			return false;
+		}
+	}
+};
+LINK_ENTITY_TO_CLASS(item_ammo_customammo_buckshotsniper, CItem_BoxCustomBuckshotSniper);
+
 
 // ==================================================================
 // Ammo crate which will supply infinite ammo of the specified type

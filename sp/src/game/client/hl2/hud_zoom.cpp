@@ -25,6 +25,8 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
+ConVar cl_hud_zoom_draw("cl_hud_zoom_draw", "1", FCVAR_ARCHIVE);
+
 //-----------------------------------------------------------------------------
 // Purpose: Draws the zoom screen
 //-----------------------------------------------------------------------------
@@ -121,6 +123,8 @@ bool CHudZoom::ShouldDraw( void )
 	if ( pPlayer == NULL )
 		return false;
 
+	if (cl_hud_zoom_draw.GetBool())
+	{
 	if ( pPlayer->m_HL2Local.m_bZooming )
 	{
 		// need to paint
@@ -130,6 +134,11 @@ bool CHudZoom::ShouldDraw( void )
 	{
 		// keep painting until state is finished
 		bNeedsDraw = true;
+		}
+	}
+	else
+	{
+		bNeedsDraw = false;
 	}
 
 	return ( bNeedsDraw && CHudElement::ShouldDraw() );

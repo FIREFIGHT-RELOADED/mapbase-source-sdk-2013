@@ -698,7 +698,7 @@ void CNPC_Antlion::MeleeAttack( float distance, float damage, QAngle &viewPunch,
 
 		//FIXME: Until the interaction is setup, kill combine soldiers in one hit -- jdw
 #ifdef MAPBASE
-		if ( pHurt->Classify() == CLASS_COMBINE && FClassnameIs( pHurt, "npc_combine_s" ) && GlobalEntity_GetState("antlion_noinstakill") != GLOBAL_ON )
+		if ( pHurt->Classify() == CLASS_COMBINE && (FClassnameIs(pHurt, "npc_combine_s") || FClassnameIs(pHurt, "npc_combine_e") || FClassnameIs(pHurt, "npc_combine_p") || FClassnameIs(pHurt, "npc_combine_shot") || FClassnameIs(pHurt, "npc_combine_ace")) && GlobalEntity_GetState("antlion_noinstakill") != GLOBAL_ON )
 #else
 		if ( FClassnameIs( pHurt, "npc_combine_s" ) )
 #endif
@@ -1149,7 +1149,17 @@ void CNPC_Antlion::HandleAnimEvent( animevent_t *pEvent )
 
 				// Tell any squadmates not to fire for some portion of the time this volley will be in the air (except on hard)
 				if ( g_pGameRules->IsSkillLevel( SKILL_HARD ) == false )
+				{
 					DelaySquadAttack( flTime );
+				}
+				else if (g_pGameRules->IsSkillLevel(SKILL_VERYHARD) == false)
+				{
+					DelaySquadAttack(flTime);
+				}
+				else if (g_pGameRules->IsSkillLevel(SKILL_NIGHTMARE) == false)
+				{
+					DelaySquadAttack(flTime);
+				}
 
 				for ( int i = 0; i < 6; i++ )
 				{
@@ -1180,7 +1190,7 @@ void CNPC_Antlion::HandleAnimEvent( animevent_t *pEvent )
 
 				for ( int i = 0; i < 8; i++ )
 				{
-					DispatchParticleEffect( "blood_impact_yellow_01", vSpitPos + RandomVector( -12.0f, 12.0f ), RandomAngle( 0, 360 ) );
+					DispatchParticleEffect("smod_drip_y", vSpitPos + RandomVector(-12.0f, 12.0f), RandomAngle(0, 360));
 				}
 
 				EmitSound( "NPC_Antlion.PoisonShoot" );
@@ -2459,6 +2469,18 @@ int CNPC_Antlion::SelectSchedule( void )
 	//Otherwise do basic state schedule selection
 	switch ( m_NPCState )
 	{	
+	case NPC_STATE_IDLE:
+		{
+			return SCHED_PATROL_WALK_LOOP;
+		}
+		break;
+
+	case NPC_STATE_ALERT:
+		{
+			return SCHED_PATROL_WALK_LOOP;
+		}
+		break;
+
 	case NPC_STATE_COMBAT:
 		{
 			// Worker-only AI
@@ -2830,6 +2852,9 @@ void CNPC_Antlion::IdleSound( void )
 //-----------------------------------------------------------------------------
 void CNPC_Antlion::PainSound( const CTakeDamageInfo &info )
 {
+	if (IsOnFire())
+		return;
+
 	EmitSound( "NPC_Antlion.Pain" );
 }
 
@@ -4095,6 +4120,7 @@ bool CNPC_Antlion::CorpseGib( const CTakeDamageInfo &info )
 		GetBonePosition( s_nBodyBone, vecOrigin, angBone );
 
 		DispatchParticleEffect( "AntlionGib", vecOrigin, QAngle( 0, 0, 0 ) );
+		DispatchParticleEffect("smod_blood_gib_y", WorldSpaceCenter(), GetAbsAngles());
 	}
 
 	Vector velocity = vec3_origin;
@@ -4115,12 +4141,15 @@ bool CNPC_Antlion::CorpseGib( const CTakeDamageInfo &info )
 void CNPC_Antlion::Touch( CBaseEntity *pOther )
 {
 	//See if the touching entity is a vehicle
-	CBasePlayer *pPlayer = ToBasePlayer( AI_GetSinglePlayer() );
+	//CBasePlayer *pPlayer = ToBasePlayer( AI_GetSinglePlayer() );
 	
 	// FIXME: Technically we'll want to check to see if a vehicle has touched us with the player OR NPC driver
 
-	if ( pPlayer && pPlayer->IsInAVehicle() )
+	for (int i = 1; i <= gpGlobals->maxClients; i++)
 	{
+		CBasePlayer *pPlayer = UTIL_PlayerByIndex(i);
+		if (!pPlayer || !pPlayer->IsInAVehicle())
+			continue;
 		IServerVehicle	*pVehicle = pPlayer->GetVehicle();
 		CBaseEntity *pVehicleEnt = pVehicle->GetVehicleEnt();
 
@@ -4170,6 +4199,7 @@ void CNPC_Antlion::Touch( CBaseEntity *pOther )
 					}
 				}
 			}
+			break;
 		}
 	}
 
@@ -4501,6 +4531,7 @@ void CNPC_Antlion::DoPoisonBurst()
 		RadiusDamage( info, GetAbsOrigin(), sk_antlion_worker_burst_radius.GetFloat(), CLASS_NONE, this );
 
 		DispatchParticleEffect( "antlion_gib_02", WorldSpaceCenter(), GetAbsAngles() );
+		DispatchParticleEffect("smod_blood_gib_y", WorldSpaceCenter(), GetAbsAngles());
 	}
 	else
 	{

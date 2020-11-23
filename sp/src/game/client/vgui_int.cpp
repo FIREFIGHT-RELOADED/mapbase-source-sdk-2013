@@ -23,6 +23,7 @@
 #include <KeyValues.h>
 #include "filesystem.h"
 #include "matsys_controls/matsyscontrols.h"
+//#include "firefightreloaded\IStorePanel.h"
 
 #ifdef SIXENSE
 #include "sixense/in_sixense.h"
@@ -32,10 +33,15 @@
 #include "tf_gamerules.h"
 #endif
 
+#include "firefightreloaded/vgui/fr_mainmenu.h"
+#include "firefightreloaded/vgui/fr_mainmenu_interface.h"
+
 using namespace vgui;
 
 void MP3Player_Create( vgui::VPANEL parent );
 void MP3Player_Destroy();
+
+void OverrideMainMenu();
 
 #include <vgui/IInputInternal.h>
 vgui::IInputInternal *g_InputInternal = NULL;
@@ -205,6 +211,9 @@ void VGui_CreateGlobalPanels( void )
 	loadingdisc->Create( gameToolParent );
 	messagechars->Create( gameToolParent );
 
+	MainMenu->Create(NULL);		
+	OverrideMainMenu();
+
 	// Debugging or related tool
 	fps->Create( toolParent );
 #if defined( TRACK_BLOCKING_IO )
@@ -220,6 +229,11 @@ void VGui_CreateGlobalPanels( void )
 #ifdef SIXENSE
 	g_pSixenseInput->CreateGUI( gameToolParent );
 #endif
+
+	/*
+	VPANEL GameUiDll = enginevgui->GetPanel(PANEL_GAMEUIDLL);
+	storepanel->Create(GameUiDll);
+	*/
 }
 
 void VGui_Shutdown()
@@ -240,6 +254,8 @@ void VGui_Shutdown()
 	messagechars->Destroy();
 	loadingdisc->Destroy();
 	internalCenterPrint->Destroy();
+
+	//storepanel->Destroy();
 
 	if ( g_pClientMode )
 	{

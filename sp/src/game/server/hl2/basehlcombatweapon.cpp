@@ -111,6 +111,11 @@ void CHLMachineGun::PrimaryAttack( void )
 	SendWeaponAnim( GetPrimaryAttackActivity() );
 	pPlayer->SetAnimation( PLAYER_ATTACK1 );
 
+	if (GetWpnData().m_bUseMuzzleSmoke)
+	{
+		DispatchParticleEffect("weapon_muzzle_smoke", PATTACH_POINT_FOLLOW, pPlayer->GetViewModel(), "muzzle", true);
+	}
+
 	// Register a muzzleflash for the AI
 	pPlayer->SetMuzzleFlashTime( gpGlobals->curtime + 0.5 );
 }
@@ -357,6 +362,10 @@ void CHLSelectFireMachineGun::PrimaryAttack( void )
 	if ( pOwner )
 	{
 		m_iPrimaryAttacks++;
+		if (GetWpnData().m_bUseMuzzleSmoke)
+		{
+			DispatchParticleEffect("weapon_muzzle_smoke", PATTACH_POINT_FOLLOW, pOwner->GetViewModel(), "muzzle", true);
+		}
 		gamestats->Event_WeaponFired( pOwner, true, GetClassname() );
 	}
 }

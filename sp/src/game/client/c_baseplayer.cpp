@@ -331,6 +331,13 @@ END_RECV_TABLE()
 
 		RecvPropString( RECVINFO(m_szLastPlaceName) ),
 
+		RecvPropInt   ( RECVINFO( m_iExp ) ),
+		RecvPropInt   ( RECVINFO( m_iLevel ) ),
+		RecvPropInt	  ( RECVINFO( m_iFrags ) ),
+		RecvPropInt   ( RECVINFO( m_iMaxExp ) ),
+		RecvPropInt   ( RECVINFO( m_iPerkInfiniteAmmo ) ),
+		RecvPropInt	  ( RECVINFO( m_iMoney ) ),
+
 #if defined USES_ECON_ITEMS
 		RecvPropUtlVector( RECVINFO_UTLVECTOR( m_hMyWearables ), MAX_WEARABLES_SENT_FROM_SERVER,	RecvPropEHandle(NULL, 0, 0) ),
 #endif

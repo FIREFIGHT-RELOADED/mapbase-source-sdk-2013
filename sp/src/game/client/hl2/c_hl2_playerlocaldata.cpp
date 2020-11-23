@@ -14,6 +14,7 @@
 BEGIN_RECV_TABLE_NOBASE( C_HL2PlayerLocalData, DT_HL2Local )
 	RecvPropFloat( RECVINFO(m_flSuitPower) ),
 	RecvPropInt( RECVINFO(m_bZooming) ),
+	RecvPropInt(RECVINFO(m_fIsInBullettime)),
 	RecvPropInt( RECVINFO(m_bitsActiveDevices) ),
 	RecvPropInt( RECVINFO(m_iSquadMemberCount) ),
 	RecvPropInt( RECVINFO(m_iSquadMedicCount) ),

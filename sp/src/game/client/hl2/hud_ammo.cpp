@@ -50,6 +50,8 @@ private:
 	CHandle< C_BaseEntity > m_hCurrentVehicle;
 	int		m_iAmmo;
 	int		m_iAmmo2;
+	CPanelAnimationVarAliasType(float, primaryammoicon_xpos, "primaryammoicon_xpos", "8", "proportional_float");
+	CPanelAnimationVarAliasType(float, primaryammoicon_ypos, "primaryammoicon_ypos", "8", "proportional_float");
 	CHudTexture *m_iconPrimaryAmmo;
 };
 
@@ -124,7 +126,7 @@ void CHudAmmo::UpdatePlayerAmmo( C_BasePlayer *player )
 	hudlcd->SetGlobalStat( "(weapon_print_name)", wpn ? wpn->GetPrintName() : " " );
 	hudlcd->SetGlobalStat( "(weapon_name)", wpn ? wpn->GetName() : " " );
 
-	if ( !wpn || !player || !wpn->UsesPrimaryAmmo() )
+	if (!wpn || !player || !wpn->UsesPrimaryAmmo() || wpn->IsMeleeWeapon())
 	{
 		hudlcd->SetGlobalStat( "(ammo_primary)", "n/a" );
         hudlcd->SetGlobalStat( "(ammo_secondary)", "n/a" );
@@ -338,13 +340,15 @@ void CHudAmmo::Paint( void )
 #ifndef HL2MP
 	if ( m_hCurrentVehicle == NULL && m_iconPrimaryAmmo )
 	{
-		int nLabelHeight;
-		int nLabelWidth;
-		surface()->GetTextSize( m_hTextFont, m_LabelText, nLabelWidth, nLabelHeight );
+		//int nLabelHeight;
+		//int nLabelWidth;
+		//surface()->GetTextSize( m_hTextFont, m_LabelText, nLabelWidth, nLabelHeight );
 
 		// Figure out where we're going to put this
-		int x = text_xpos + ( nLabelWidth - m_iconPrimaryAmmo->Width() ) / 2;
-		int y = text_ypos - ( nLabelHeight + ( m_iconPrimaryAmmo->Height() / 2 ) );
+		//int x = text_xpos + ( nLabelWidth - m_iconPrimaryAmmo->Width() ) / 2;
+		//int y = text_ypos - ( nLabelHeight + ( m_iconPrimaryAmmo->Height() / 2 ) );
+		int x = primaryammoicon_xpos;
+		int y = primaryammoicon_ypos;
 		
 		m_iconPrimaryAmmo->DrawSelf( x, y, GetFgColor() );
 	}
@@ -426,13 +430,15 @@ public:
 #ifndef HL2MP
 		if ( m_iconSecondaryAmmo )
 		{
-			int nLabelHeight;
-			int nLabelWidth;
-			surface()->GetTextSize( m_hTextFont, m_LabelText, nLabelWidth, nLabelHeight );
+			//int nLabelHeight;
+			//int nLabelWidth;
+			//surface()->GetTextSize( m_hTextFont, m_LabelText, nLabelWidth, nLabelHeight );
 
 			// Figure out where we're going to put this
-			int x = text_xpos + ( nLabelWidth - m_iconSecondaryAmmo->Width() ) / 2;
-			int y = text_ypos - ( nLabelHeight + ( m_iconSecondaryAmmo->Height() / 2 ) );
+			//int x = text_xpos + ( nLabelWidth - m_iconSecondaryAmmo->Width() ) / 2;
+			//int y = text_ypos - ( nLabelHeight + ( m_iconSecondaryAmmo->Height() / 2 ) );
+			int x = secondaryammoicon_xpos;
+			int y = secondaryammoicon_ypos;
 
 			m_iconSecondaryAmmo->DrawSelf( x, y, GetFgColor() );
 		}
@@ -447,7 +453,7 @@ protected:
 		C_BaseCombatWeapon *wpn = GetActiveWeapon();
 		C_BasePlayer *player = C_BasePlayer::GetLocalPlayer();
 		IClientVehicle *pVehicle = player ? player->GetVehicle() : NULL;
-		if (!wpn || !player || pVehicle)
+		if (!wpn || !player || pVehicle || wpn->IsMeleeWeapon())
 		{
 			m_hCurrentActiveWeapon = NULL;
 			SetPaintEnabled(false);
@@ -496,6 +502,8 @@ private:
 	CHandle< C_BaseCombatWeapon > m_hCurrentActiveWeapon;
 	CHudTexture *m_iconSecondaryAmmo;
 	int		m_iAmmo;
+	CPanelAnimationVarAliasType(float, secondaryammoicon_xpos, "secondaryammoicon_xpos", "8", "proportional_float");
+	CPanelAnimationVarAliasType(float, secondaryammoicon_ypos, "secondaryammoicon_ypos", "8", "proportional_float");
 };
 
 DECLARE_HUDELEMENT( CHudSecondaryAmmo );

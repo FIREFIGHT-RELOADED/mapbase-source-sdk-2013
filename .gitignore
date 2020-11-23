@@ -72,3 +72,4 @@ config.cfg
 *.db-shm
 *.db-wal
 mapbase_release_build_v5_1.zip
+*.bak

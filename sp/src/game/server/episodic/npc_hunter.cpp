@@ -160,6 +160,10 @@ ConVar hunter_stand_still( "hunter_stand_still", "0" ); // used for debugging, k
 
 ConVar hunter_siege_frequency( "hunter_siege_frequency", "12" );
 
+ConVar hunter_laugh("hunter_laugh", "1", FCVAR_ARCHIVE, "If true, the hunter will laugh at the player if the player's health is under the value of hunter_laugh_healthvalue.");
+ConVar hunter_laugh_frequency("hunter_laugh_frequency", "120", FCVAR_NONE, "Changes the frequency of the hunter's laugh. Lower values = higher frequency. Higher values = lower frequency.");
+ConVar hunter_laugh_healthvalue("hunter_laugh_healthvalue", "20", FCVAR_NONE, "Sets the minimal amount of health the player needs in order for the hunter to laugh at it.");
+
 #define HUNTER_FOV_DOT					0.0		// 180 degree field of view
 #define HUNTER_CHARGE_MIN				256
 #define HUNTER_CHARGE_MAX				1024
@@ -179,6 +183,9 @@ ConVar hunter_siege_frequency( "hunter_siege_frequency", "12" );
 #define NUM_FLECHETTE_VOLLEY_ON_FOLLOW 4
 
 #define HUNTER_SIEGE_MAX_DIST_MODIFIER 2.0f
+
+#define HUNTER_SKIN_DEFAULT		0
+#define HUNTER_SKIN_DEAD		1
 
 //-----------------------------------------------------------------------------
 // Animation events
@@ -823,7 +830,7 @@ void CHunterFlechette::SeekThink()
 //-----------------------------------------------------------------------------
 void CHunterFlechette::DopplerThink()
 {
-	CBasePlayer *pPlayer = AI_GetSinglePlayer();
+	CBasePlayer *pPlayer = UTIL_GetNearestPlayer(GetAbsOrigin());
 	if ( !pPlayer )
 		return;
 
@@ -998,7 +1005,7 @@ public:
 			}
 
 			// If we hit an antlion, don't stop, but kill it
-			if ( pEntity->Classify() == CLASS_ANTLION )
+			if ( pEntity->Classify() == CLASS_ANTLION  && g_pGameRules->IsSkillLevel( SKILL_EASY ) )
 			{
 				CBaseEntity *pHunter = (CBaseEntity *)EntityFromEntityHandle( m_pPassEnt );
 				Hunter_ApplyChargeDamage( pHunter, pEntity, pEntity->GetHealth() );
@@ -1529,6 +1536,7 @@ private:
 
 	bool	m_bInLargeOutdoorMap;
 	float	m_flTimeSawEnemyAgain;
+	bool	m_bIsLaughing;
 
 	// Sounds
 	//CSoundPatch	*m_pGunFiringSound;
@@ -1696,6 +1704,7 @@ void CNPC_Hunter::Precache()
 	PrecacheScriptSound( "NPC_Hunter.PreCharge" );
 	PrecacheScriptSound( "NPC_Hunter.Angry" );
 	PrecacheScriptSound( "NPC_Hunter.Death" );
+	PrecacheScriptSound( "NPC_Hunter.Gloat" );
 	PrecacheScriptSound( "NPC_Hunter.FireMinigun" );
 	PrecacheScriptSound( "NPC_Hunter.Footstep" );
 	PrecacheScriptSound( "NPC_Hunter.BackFootstep" );
@@ -1737,6 +1746,7 @@ void CNPC_Hunter::Precache()
 	{
 		m_bInLargeOutdoorMap = true;
 	}
+	m_bIsLaughing = false;
 
 	BaseClass::Precache();
 }
@@ -1924,7 +1934,7 @@ void CNPC_Hunter::IdleSound()
 //-----------------------------------------------------------------------------
 bool CNPC_Hunter::ShouldPlayIdleSound()
 {
-	if ( random->RandomInt(0, 99) == 0 && !HasSpawnFlags( SF_NPC_GAG ) )
+	if (random->RandomInt(0, 99) == 0 && !HasSpawnFlags(SF_NPC_GAG) && !m_bIsLaughing)
 		return true;
 	
 	return false;
@@ -2193,6 +2203,26 @@ void CNPC_Hunter::NPCThink()
 
 	UpdateAim();
 	UpdateEyes();
+
+	CBasePlayer *pPlayer = UTIL_PlayerByIndex(1);
+
+	if (hunter_laugh.GetBool() && !pPlayer->IsDead() && !m_bIsLaughing)
+	{
+		if (random->RandomInt(0, hunter_laugh_frequency.GetInt()) == 0 && pPlayer->GetHealth() < hunter_laugh_healthvalue.GetInt() && !m_bIsLaughing)
+		{
+			//laugh at the player's own stupidity while idle.
+			m_bIsLaughing = true;
+			EmitSound("NPC_Hunter.Gloat");
+		}
+		else
+		{
+			m_bIsLaughing = false;
+		}
+	}
+	else
+	{
+		m_bIsLaughing = false;
+	}
 }
 
 
@@ -2423,7 +2453,7 @@ void CNPC_Hunter::ManageSiegeTargets()
 	}
 
 	m_flTimeNextSiegeTargetAttack = gpGlobals->curtime + (hunter_siege_frequency.GetFloat() * RandomFloat( 0.8f, 1.2f) );
-	CBasePlayer *pPlayer = AI_GetSinglePlayer();
+	CBasePlayer *pPlayer = UTIL_GetNearestPlayer(GetAbsOrigin());
 
 	// Start by assuming we are not going to create a siege target
 	bool bCreateSiegeTarget = false;
@@ -5349,6 +5379,9 @@ void CNPC_Hunter::AlertSound()
 //-----------------------------------------------------------------------------
 void CNPC_Hunter::PainSound( const CTakeDamageInfo &info )
 {
+	if (IsOnFire())
+		return;
+
 	if ( gpGlobals->curtime > m_flNextDamageTime )
 	{
 		EmitSound( "NPC_Hunter.Pain" );
@@ -5361,6 +5394,9 @@ void CNPC_Hunter::PainSound( const CTakeDamageInfo &info )
 //-----------------------------------------------------------------------------
 void CNPC_Hunter::DeathSound( const CTakeDamageInfo &info )
 {
+	if (IsOnFire())
+		return;
+
 	EmitSound( "NPC_Hunter.Death" );
 }
 
@@ -5770,7 +5806,7 @@ int CNPC_Hunter::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 	}
 
 	// Show damage effects if we actually took damage.
-	if ( ( myInfo.GetDamageType() & ( DMG_CRUSH | DMG_BLAST ) ) && ( myInfo.GetDamage() > 0 ) )
+	if ((myInfo.GetDamageType() & (DMG_CRUSH | DMG_BLAST | DMG_KICK | DMG_KNOCKBACK)) && (myInfo.GetDamage() > 0))
 	{
 		if ( !bHitByUnoccupiedCar )
 			SetCondition( COND_HUNTER_STAGGERED );
@@ -5898,6 +5934,11 @@ void CNPC_Hunter::Event_Killed( const CTakeDamageInfo &info )
 	SetContextThink( NULL, 0, HUNTER_BLEED_THINK );
 
 	StopParticleEffects( this );
+
+	if (m_nSkin != HUNTER_SKIN_DEAD)
+	{
+		m_nSkin = HUNTER_SKIN_DEAD;
+	}
 
 	BaseClass::Event_Killed( info );
 }
