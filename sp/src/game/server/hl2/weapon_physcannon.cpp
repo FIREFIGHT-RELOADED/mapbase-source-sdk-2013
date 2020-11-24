@@ -70,6 +70,9 @@ ConVar physcannon_right_turrets( "physcannon_right_turrets", "0" );
 
 extern ConVar hl2_normspeed;
 extern ConVar hl2_walkspeed;
+extern ConVar sv_leagcy_maxspeed;
+extern ConVar fr_new_normspeed;
+extern ConVar fr_new_walkspeed;
 
 #define PHYSCANNON_BEAM_SPRITE "sprites/orangelight1.vmt"
 #define PHYSCANNON_GLOW_SPRITE "sprites/glow04_noz.vmt"
@@ -1238,6 +1241,7 @@ public:
 
 	DECLARE_SERVERCLASS();
 	DECLARE_DATADESC();
+	DECLARE_ACTTABLE();
 
 	CWeaponPhysCannon( void );
 
@@ -1413,6 +1417,20 @@ IMPLEMENT_SERVERCLASS_ST(CWeaponPhysCannon, DT_WeaponPhysCannon)
 	SendPropBool( SENDINFO( m_bIsCurrentlyUpgrading ) ),
 	SendPropFloat( SENDINFO( m_flTimeForceView ) ),
 END_SEND_TABLE()
+
+acttable_t CWeaponPhysCannon::m_acttable[] =
+{
+	{ ACT_HL2MP_IDLE, ACT_HL2MP_IDLE_PHYSGUN, false },
+	{ ACT_HL2MP_RUN, ACT_HL2MP_RUN_PHYSGUN, false },
+	{ ACT_HL2MP_IDLE_CROUCH, ACT_HL2MP_IDLE_CROUCH_PHYSGUN, false },
+	{ ACT_HL2MP_WALK_CROUCH, ACT_HL2MP_WALK_CROUCH_PHYSGUN, false },
+	{ ACT_HL2MP_GESTURE_RANGE_ATTACK, ACT_HL2MP_GESTURE_RANGE_ATTACK_PHYSGUN, false },
+	{ ACT_HL2MP_GESTURE_RELOAD, ACT_HL2MP_GESTURE_RELOAD_PHYSGUN, false },
+	{ ACT_HL2MP_JUMP, ACT_HL2MP_JUMP_PHYSGUN, false },
+	{ ACT_RANGE_ATTACK1, ACT_RANGE_ATTACK_SLAM, false },
+};
+
+IMPLEMENT_ACTTABLE(CWeaponPhysCannon);
 
 LINK_ENTITY_TO_CLASS( weapon_physcannon, CWeaponPhysCannon );
 PRECACHE_WEAPON_REGISTER( weapon_physcannon );
@@ -2245,7 +2263,7 @@ void CWeaponPhysCannon::PrimaryAttack( void )
 		if( GetOwner()->IsPlayer() && !IsMegaPhysCannon() )
 		{
 			// Don't let the player zap any NPC's except regular antlions and headcrabs.
-			if( pEntity->IsNPC() && pEntity->Classify() != CLASS_HEADCRAB && !FClassnameIs(pEntity, "npc_antlion") )
+			if (pEntity->IsNPC())
 			{
 				DryFire();
 				return;
@@ -2451,6 +2469,9 @@ bool CWeaponPhysCannon::AttachObject( CBaseEntity *pObject, const Vector &vPosit
 		// NVNT set the players constant force to simulate holding mass
 		HapticSetConstantForce(pOwner,clamp(m_grabController.GetLoadWeight()*0.05,1,5)*Vector(0,-1,0));
 #endif
+
+		if (sv_leagcy_maxspeed.GetBool())
+		{
 		pOwner->EnableSprint( false );
 
 		float	loadWeight = ( 1.0f - GetLoadPercentage() );
@@ -2458,6 +2479,11 @@ bool CWeaponPhysCannon::AttachObject( CBaseEntity *pObject, const Vector &vPosit
 
 		//Msg( "Load perc: %f -- Movement speed: %f/%f\n", loadWeight, maxSpeed, hl2_normspeed.GetFloat() );
 		pOwner->SetMaxSpeed( maxSpeed );
+	}
+		else
+		{
+			pOwner->SetMaxSpeed(fr_new_normspeed.GetFloat());
+		}
 	}
 
 	// Don't drop again for a slight delay, in case they were pulling objects near them
@@ -2904,8 +2930,15 @@ void CWeaponPhysCannon::DetachObject( bool playSound, bool wasLaunched )
 	CHL2_Player *pOwner = (CHL2_Player *)ToBasePlayer( GetOwner() );
 	if( pOwner != NULL )
 	{
-		pOwner->EnableSprint( true );
-		pOwner->SetMaxSpeed( hl2_normspeed.GetFloat() );
+		if (sv_leagcy_maxspeed.GetBool())
+		{
+			pOwner->EnableSprint( true );
+			pOwner->SetMaxSpeed( hl2_normspeed.GetFloat() );
+		}
+		else
+		{
+			pOwner->SetMaxSpeed(fr_new_normspeed.GetFloat());
+		}
 		
 		if( wasLaunched )
 		{

@@ -46,6 +46,9 @@ extern IMaterialSystemHardwareConfig *g_pMaterialSystemHardwareConfig;
 
 #define SCANNER_HINT_INSPECT_DELAY		15		// Check for hint nodes this often
 	
+#define SCANNER_MINE_RESPAWN_DELAY		8
+#define SCANNER_MINE_REDEPLOY_DELAY		2
+	
 #define	SPOTLIGHT_WIDTH					32
 
 #define SCANNER_SPOTLIGHT_NEAR_DIST		64
@@ -125,6 +128,8 @@ BEGIN_DATADESC( CNPC_CScanner )
 	DEFINE_FIELD( m_fInspectEndTime,		FIELD_TIME ),
 	DEFINE_FIELD( m_fCheckCitizenTime,		FIELD_TIME ),
 	DEFINE_FIELD( m_fCheckHintTime,			FIELD_TIME ),
+	DEFINE_FIELD( m_fMineRespawnTime,		FIELD_TIME ),
+	DEFINE_FIELD(m_fMineRedeployTime, FIELD_TIME),
 	DEFINE_KEYFIELD( m_bShouldInspect,		FIELD_BOOLEAN,	"ShouldInspect" ),
 	DEFINE_KEYFIELD( m_bOnlyInspectPlayers, FIELD_BOOLEAN,  "OnlyInspectPlayers" ),
 	DEFINE_KEYFIELD( m_bNeverInspectPlayers,FIELD_BOOLEAN,  "NeverInspectPlayers" ),
@@ -273,6 +278,8 @@ void CNPC_CScanner::Spawn(void)
 	m_fInspectEndTime		= 0;
 	m_fCheckCitizenTime		= gpGlobals->curtime + SCANNER_CIT_INSPECT_DELAY;
 	m_fCheckHintTime		= gpGlobals->curtime + SCANNER_HINT_INSPECT_DELAY;
+	m_fMineRespawnTime		= gpGlobals->curtime + 1.0f;
+	m_fMineRedeployTime		= 0;
 	m_fNextPhotographTime	= 0;
 
 	m_vSpotlightTargetPos	= vec3_origin;
@@ -553,9 +560,105 @@ void CNPC_CScanner::NPCThink(void)
 	{
 		BaseClass::NPCThink();
 		SpotlightUpdate();
+		if( m_bIsClawScanner )
+		{
+			MineBehavior();
+		}
+	}
+
+void CNPC_CScanner::MineBehavior(void)
+{
+	if (gpGlobals->curtime > m_fMineRespawnTime)
+	{
+		EquipMine();
+		m_fMineRespawnTime = gpGlobals->curtime + SCANNER_MINE_RESPAWN_DELAY;
+		m_fMineRedeployTime = gpGlobals->curtime + SCANNER_MINE_REDEPLOY_DELAY;
+	}
+
+	if (gpGlobals->curtime > m_fMineRedeployTime)
+	{
+		//first off, make sure the players are not facing us.
+		for (int i = 1; i <= gpGlobals->maxClients; i++)
+		{
+			CBasePlayer *pPlayer = UTIL_PlayerByIndex(i);
+			if (pPlayer)
+			{
+				// Only spawn if the player's looking away from me
+				if (pPlayer->FInViewCone(GetAbsOrigin()) && pPlayer->FVisible(GetAbsOrigin()))
+				{
+					if ((pPlayer->GetFlags() & FL_NOTARGET))
+						return;
+
+					CBaseEntity *child;
+					for (child = FirstMoveChild(); child != NULL; child = child->NextMovePeer())
+					{
+						if (FClassnameIs(child, "combine_mine"))
+						{
+							DeployMine();
+						}
+					}
+					m_fMineRedeployTime = gpGlobals->curtime + SCANNER_MINE_REDEPLOY_DELAY;
+				}
+				else
+				{
+					m_fMineRedeployTime = gpGlobals->curtime + SCANNER_MINE_REDEPLOY_DELAY;
+				}
+			}
+		}
 	}
 }
 
+void CNPC_CScanner::EquipMine(void)
+{
+	CBaseEntity *child;
+	// iterate through all children
+	for (child = FirstMoveChild(); child != NULL; child = child->NextMovePeer())
+	{
+		if (FClassnameIs(child, "combine_mine"))
+		{
+			// Already have a mine!
+			return;
+		}
+	}
+
+	CBaseEntity *pEnt;
+
+	pEnt = CreateEntityByName("combine_mine");
+	bool bPlacedMine = false;
+
+	Vector	vecOrigin;
+	QAngle	angles;
+	int		attachment;
+
+	attachment = LookupAttachment("claw");
+
+	if (attachment > -1)
+	{
+		GetAttachment(attachment, vecOrigin, angles);
+
+		pEnt->SetAbsOrigin(vecOrigin);
+		pEnt->SetAbsAngles(angles);
+		pEnt->SetOwnerEntity(this);
+		pEnt->SetParent(this, attachment);
+
+		m_bIsOpen = true;
+		SetActivity(ACT_IDLE_ANGRY);
+		bPlacedMine = true;
+	}
+
+	if (!bPlacedMine)
+	{
+		Vector vecMineLocation = GetAbsOrigin();
+		vecMineLocation.z -= 32.0;
+
+		pEnt->SetAbsOrigin(vecMineLocation);
+		pEnt->SetAbsAngles(GetAbsAngles());
+		pEnt->SetOwnerEntity(this);
+		pEnt->SetParent(this);
+	}
+
+	pEnt->Spawn();
+}
 
 //-----------------------------------------------------------------------------
 // Purpose: 
@@ -714,7 +817,7 @@ CBaseEntity* CNPC_CScanner::BestInspectTarget(void)
 
 	if ( m_bOnlyInspectPlayers )
 	{
-		CBasePlayer *pPlayer = AI_GetSinglePlayer();
+		CBasePlayer *pPlayer = UTIL_GetNearestPlayer(GetAbsOrigin());
 		if ( !pPlayer )
 			return NULL;
 

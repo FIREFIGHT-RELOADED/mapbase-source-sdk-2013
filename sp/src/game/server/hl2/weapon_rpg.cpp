@@ -1411,6 +1411,14 @@ acttable_t	CWeaponRPG::m_acttable[] =
 	{ ACT_RUN,						ACT_RUN_RPG,					true },
 	{ ACT_RUN_CROUCH,				ACT_RUN_CROUCH_RPG,				true },
 	{ ACT_COVER_LOW,				ACT_COVER_LOW_RPG,				true },
+	{ ACT_HL2MP_IDLE,				ACT_HL2MP_IDLE_RPG,				false },
+	{ ACT_HL2MP_RUN,				ACT_HL2MP_RUN_RPG,				false },
+	{ ACT_HL2MP_IDLE_CROUCH,		ACT_HL2MP_IDLE_CROUCH_RPG,		false },
+	{ ACT_HL2MP_WALK_CROUCH,		ACT_HL2MP_WALK_CROUCH_RPG,		false },
+	{ ACT_HL2MP_GESTURE_RANGE_ATTACK,		ACT_HL2MP_GESTURE_RANGE_ATTACK_RPG,		false },
+	{ ACT_HL2MP_GESTURE_RELOAD,		ACT_HL2MP_GESTURE_RELOAD_RPG,	false },
+	{ ACT_HL2MP_JUMP,				ACT_HL2MP_JUMP_RPG,				false },
+	{ ACT_RANGE_ATTACK1,			ACT_RANGE_ATTACK_RPG,			false },
 };
 
 IMPLEMENT_ACTTABLE(CWeaponRPG);
@@ -1485,10 +1493,12 @@ void CWeaponRPG::Activate( void )
 		if ( pOwner == NULL )
 			return;
 
+		/*
 		if ( pOwner->GetActiveWeapon() == this )
 		{
 			StartGuiding();
 		}
+		*/
 	}
 }
 
@@ -1692,7 +1702,7 @@ void CWeaponRPG::SuppressGuiding( bool state )
 
 	if ( m_hLaserDot == NULL )
 	{
-		StartGuiding();
+		//StartGuiding();
 
 		//STILL!?
 		if ( m_hLaserDot == NULL )
@@ -1715,7 +1725,7 @@ void CWeaponRPG::SuppressGuiding( bool state )
 //-----------------------------------------------------------------------------
 bool CWeaponRPG::Lower( void )
 {
-	if ( m_hMissile != NULL )
+	if (m_hMissile != NULL && IsGuiding())
 		return false;
 
 	return BaseClass::Lower();
@@ -1734,11 +1744,13 @@ void CWeaponRPG::ItemPostFrame( void )
 		return;
 
 	//If we're pulling the weapon out for the first time, wait to draw the laser
+	/*
 	if ( ( m_bInitialStateUpdate ) && ( GetActivity() != ACT_VM_DRAW ) )
 	{
 		StartGuiding();
 		m_bInitialStateUpdate = false;
 	}
+	*/
 
 	// Supress our guiding effects if we're lowered
 	if ( GetIdealActivity() == ACT_VM_IDLE_LOWERED || GetIdealActivity() == ACT_VM_RELOAD )
@@ -1752,12 +1764,10 @@ void CWeaponRPG::ItemPostFrame( void )
 
 	//Player has toggled guidance state
 	//Adrian: Players are not allowed to remove the laser guide in single player anymore, bye!
-	if ( g_pGameRules->IsMultiplayer() == true )
+	//Bitl: OBJECTION!
+	if ( pPlayer->m_afButtonPressed & IN_ATTACK2 )
 	{
-		if ( pPlayer->m_afButtonPressed & IN_ATTACK2 )
-		{
-			ToggleGuiding();
-		}
+		ToggleGuiding();
 	}
 
 	//Move the laser
@@ -2014,6 +2024,9 @@ bool CWeaponRPG::Reload( void )
 		return false;
 
 	if ( pOwner->GetAmmoCount(m_iPrimaryAmmoType) <= 0 )
+		return false;
+
+	if (pOwner->GetActiveWeapon() != this)
 		return false;
 
 	WeaponSound( RELOAD );

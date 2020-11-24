@@ -35,6 +35,8 @@
 
 #include "ai_interactions.h"
 
+#include "gib.h"
+
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
@@ -344,6 +346,11 @@ int CNPC_Zombine::SelectSchedule( void )
 		return SCHED_ZOMBINE_PULL_GRENADE;
 	}
 
+	if (m_NPCState == NPC_STATE_IDLE || m_NPCState == NPC_STATE_ALERT)
+	{
+		return SCHED_PATROL_WALK_LOOP;
+	}
+
 	return BaseClass::SelectSchedule();
 }
 
@@ -427,7 +434,7 @@ void CNPC_Zombine::GatherGrenadeConditions( void )
 	if ( m_ActBusyBehavior.IsActive() )
 		return;
 
-	CBasePlayer *pPlayer = AI_GetSinglePlayer();
+	CBasePlayer *pPlayer = UTIL_GetNearestPlayer(GetAbsOrigin());
 
 	if ( pPlayer && pPlayer->FVisible( this ) )
 	{
@@ -495,7 +502,13 @@ void CNPC_Zombine::DropGrenade( Vector vDir )
 
 void CNPC_Zombine::Event_Killed( const CTakeDamageInfo &info )
 {
-	BaseClass::Event_Killed( info );
+	CTakeDamageInfo dInfo = info;
+	if (!(g_Language.GetInt() == LANGUAGE_GERMAN || UTIL_IsLowViolence()) && info.GetDamageType() & (DMG_ALWAYSGIB | DMG_BLAST | DMG_CRUSH) && !(info.GetDamageType() & (DMG_DISSOLVE)) && !m_fIsTorso)
+	{
+		dInfo.SetDamageType(info.GetDamageType() | DMG_REMOVENORAGDOLL);
+	}
+
+	BaseClass::Event_Killed( dInfo );
 
 	if ( HasGrenade() )
 	{
@@ -629,7 +642,7 @@ bool CNPC_Zombine::AllowedToSprint( void )
 
 	int iChance = SPRINT_CHANCE_VALUE;
 
-	CHL2_Player *pPlayer = dynamic_cast <CHL2_Player*> ( AI_GetSinglePlayer() );
+	CHL2_Player *pPlayer = dynamic_cast <CHL2_Player*> (UTIL_GetNearestPlayer(GetAbsOrigin()));
 
 	if ( pPlayer )
 	{

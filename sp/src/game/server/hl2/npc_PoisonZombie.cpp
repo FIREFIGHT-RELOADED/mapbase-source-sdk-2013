@@ -23,6 +23,8 @@
 #include "activitylist.h"
 #include "engine/IEngineSound.h"
 #include "npc_BaseZombie.h"
+#include "hl2_shareddefs.h"
+#include "gib.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -181,6 +183,7 @@ public:
 	virtual Class_T Classify( void );
 	virtual void Event_Killed( const CTakeDamageInfo &info );
 	virtual int OnTakeDamage_Alive( const CTakeDamageInfo &inputInfo );
+	virtual float GetHitgroupDamageMultiplier(int iHitGroup, const CTakeDamageInfo &info);
 
 	DECLARE_DATADESC();
 	DEFINE_CUSTOM_AI;
@@ -257,6 +260,9 @@ END_DATADESC()
 void CNPC_PoisonZombie::Precache( void )
 {
 	PrecacheModel("models/zombie/poison.mdl");
+
+	PrecacheModel("models/gibs/agib_p3.mdl");
+	PrecacheModel("models/gibs/agib_p4.mdl");
 
 	PrecacheScriptSound( "NPC_PoisonZombie.Die" );
 	PrecacheScriptSound( "NPC_PoisonZombie.ThrowWarn" );
@@ -473,6 +479,65 @@ int CNPC_PoisonZombie::OnTakeDamage_Alive( const CTakeDamageInfo &inputInfo )
 	return BaseClass::OnTakeDamage_Alive( inputInfo );
 }
 
+#define POISONZOMBIE_BUCKSHOT_TRIPLE_DAMAGE_DIST	96.0f // Triple damage from buckshot at 8 feet (headshot only)
+float CNPC_PoisonZombie::GetHitgroupDamageMultiplier(int iHitGroup, const CTakeDamageInfo &info)
+{
+	switch (iHitGroup)
+	{
+	case HITGROUP_HEAD:
+	{
+		int HeadshotRandom = random->RandomInt(0, 6);
+		if (!(g_Language.GetInt() == LANGUAGE_GERMAN || UTIL_IsLowViolence()) && g_fr_headshotgore.GetBool())
+		{
+			if (!m_fIsHeadless && HeadshotRandom == 0 && !(info.GetDamageType() & DMG_NEVERGIB) || !m_fIsHeadless && info.GetDamageType() & DMG_SNIPER && !(info.GetDamageType() & DMG_NEVERGIB))
+			{
+				DispatchParticleEffect("smod_headshot_g", PATTACH_POINT_FOLLOW, this, "headcrab1", true);
+				CGib::SpawnSpecificGibs(this, 3, 750, 1500, "models/gibs/agib_p3.mdl", 6);
+				CGib::SpawnSpecificGibs(this, 3, 750, 1500, "models/gibs/agib_p4.mdl", 6);
+				EmitSound("Gore.Headshot");
+				g_pGameRules->iHeadshotCount += 1;
+				RemoveHead();
+				CBasePlayer *pPlayer = UTIL_PlayerByIndex(1);
+				if (g_fr_economy.GetBool())
+				{
+					pPlayer->AddMoney(3);
+				}
+				if (!g_fr_classic.GetBool())
+				{
+					pPlayer->AddXP(5);
+				}
+			}
+			else
+			{
+				return 2.0f;
+			}
+		}
+		else
+		{
+			if (info.GetDamageType() & DMG_BUCKSHOT)
+			{
+				float flDist = FLT_MAX;
+
+				if (info.GetAttacker())
+				{
+					flDist = (GetAbsOrigin() - info.GetAttacker()->GetAbsOrigin()).Length();
+				}
+
+				if (flDist <= POISONZOMBIE_BUCKSHOT_TRIPLE_DAMAGE_DIST)
+				{
+					return 3.0f;
+				}
+			}
+			else
+			{
+				return 2.0f;
+			}
+		}
+	}
+	}
+
+	return BaseClass::GetHitgroupDamageMultiplier(iHitGroup, info);
+}
 
 //-----------------------------------------------------------------------------
 // Purpose: 
@@ -925,6 +990,11 @@ int CNPC_PoisonZombie::SelectSchedule( void )
 	if ( nSchedule == SCHED_SMALL_FLINCH )
 	{
 		 m_flNextFlinchTime = gpGlobals->curtime + random->RandomFloat( 1, 3 );
+	}
+
+	if (m_NPCState == NPC_STATE_IDLE || m_NPCState == NPC_STATE_ALERT)
+	{
+		return SCHED_PATROL_WALK_LOOP;
 	}
 
 	return nSchedule;

@@ -437,6 +437,9 @@ void CNPC_Stalker::TraceAttack( const CTakeDamageInfo &inputInfo, const Vector &
 //-----------------------------------------------------------------------------
 void CNPC_Stalker::DeathSound( const CTakeDamageInfo &info )
 { 
+	if (IsOnFire())
+		return;
+
 	EmitSound( "NPC_Stalker.Die" );
 };
 
@@ -447,6 +450,9 @@ void CNPC_Stalker::DeathSound( const CTakeDamageInfo &info )
 //-----------------------------------------------------------------------------
 void CNPC_Stalker::PainSound( const CTakeDamageInfo &info )
 { 
+	if (IsOnFire())
+		return;
+
 	EmitSound( "NPC_Stalker.Pain" );
 	m_flNextScrambleSoundTime	= gpGlobals->curtime + 1.5;
 	m_flNextBreatheSoundTime	= gpGlobals->curtime + 1.5;

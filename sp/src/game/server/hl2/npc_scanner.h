@@ -60,6 +60,9 @@ public:
 	float			GetMaxSpeed();
 	virtual void	Gib( void );
 
+	void			MineBehavior(void);
+	void			EquipMine(void);
+
 	void			HandleAnimEvent( animevent_t *pEvent );
 	Activity		NPC_TranslateActivity( Activity eNewActivity );
 
@@ -97,6 +100,8 @@ public:
 	float			m_fInspectEndTime;
 	float			m_fCheckCitizenTime;	// Time to look for citizens to harass
 	float			m_fCheckHintTime;		// Time to look for hints to inspect
+	float			m_fMineRespawnTime;
+	float			m_fMineRedeployTime;
 	bool			m_bShouldInspect;
 	bool			m_bOnlyInspectPlayers;
 	bool			m_bNeverInspectPlayers;

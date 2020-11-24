@@ -108,6 +108,8 @@ ConVar strider_ar2_altfire_dmg( "strider_ar2_altfire_dmg", "25" );
 ConVar sk_strider_num_missiles1("sk_strider_num_missiles1", "5");
 ConVar sk_strider_num_missiles2("sk_strider_num_missiles2", "7");
 ConVar sk_strider_num_missiles3("sk_strider_num_missiles3", "7");
+ConVar sk_strider_num_missiles4("sk_strider_num_missiles4", "9");
+ConVar sk_strider_num_missiles5("sk_strider_num_missiles5", "11");
 
 ConVar strider_missile_suppress_dist( "strider_missile_suppress_dist", "240" );
 ConVar strider_missile_suppress_time( "strider_missile_suppress_time", "3" );
@@ -670,7 +672,7 @@ void CNPC_Strider::PostNPCInit()
 		RemoveFlag( FL_FLY );
 	}
 
-	m_PlayerFreePass.SetPassTarget( UTIL_PlayerByIndex(1) );
+	m_PlayerFreePass.SetPassTarget(UTIL_GetNearestPlayer(GetAbsOrigin()));
 	
 	AI_FreePassParams_t freePassParams = 
 	{
@@ -796,7 +798,7 @@ int	CNPC_Strider::DrawDebugTextOverlays()
 			text_offset++;
 		}
 
-		CBaseEntity *pPlayer = UTIL_PlayerByIndex(1);
+		CBaseEntity *pPlayer = UTIL_GetNearestPlayer(GetAbsOrigin());
 		if ( pPlayer )
 		{
 			if ( GetSenses()->ShouldSeeEntity( pPlayer ) && GetSenses()->CanSeeEntity( pPlayer ) )
@@ -3010,6 +3012,9 @@ void CNPC_Strider::AlertSound()
 //---------------------------------------------------------
 void CNPC_Strider::PainSound( const CTakeDamageInfo &info )
 {
+	if (IsOnFire())
+		return;
+
 	// This means that we've exploded into pieces and have no way to whimper
 	if ( ShouldExplodeFromDamage( info ) )
 		return;
@@ -3021,6 +3026,9 @@ void CNPC_Strider::PainSound( const CTakeDamageInfo &info )
 //---------------------------------------------------------
 void CNPC_Strider::DeathSound( const CTakeDamageInfo &info )
 {
+	if (IsOnFire())
+		return;
+
 	// This means that we've exploded into pieces and have no way to whimper
 	if ( m_bExploding )
 	{
@@ -3156,6 +3164,14 @@ int CNPC_Strider::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 				{
 					damage = GetMaxHealth() / sk_strider_num_missiles3.GetFloat();
 				}
+				else if (g_pGameRules->IsSkillLevel(SKILL_VERYHARD))
+				{
+					damage = GetMaxHealth() / sk_strider_num_missiles4.GetFloat();
+				}
+				else if (g_pGameRules->IsSkillLevel(SKILL_NIGHTMARE))
+				{
+					damage = GetMaxHealth() / sk_strider_num_missiles5.GetFloat();
+				}
 				else // Medium, or unspecified
 				{
 					damage = GetMaxHealth() / sk_strider_num_missiles2.GetFloat();
@@ -3177,7 +3193,7 @@ int CNPC_Strider::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 			{
 				// See if the person that injured me is an NPC.
 				CAI_BaseNPC *pAttacker = dynamic_cast<CAI_BaseNPC *>( info.GetAttacker() );
-				CBasePlayer *pPlayer = AI_GetSinglePlayer();
+				CBasePlayer *pPlayer = UTIL_GetNearestPlayer(GetAbsOrigin());
 
 				if( pAttacker && pAttacker->IsAlive() && pPlayer )
 				{
@@ -3399,7 +3415,7 @@ bool CNPC_Strider::BecomeRagdoll( const CTakeDamageInfo &info, const Vector &for
 	{
 		// Otherwise just keel over
 		CRagdollProp *pRagdoll = NULL;
-		CBasePlayer *pPlayer = AI_GetSinglePlayer();
+		CBasePlayer *pPlayer = UTIL_GetNearestPlayer(GetAbsOrigin());
 		if ( pPlayer && mat_dxlevel.GetInt() > 0 )
 		{
 			int dxlevel = mat_dxlevel.GetInt();

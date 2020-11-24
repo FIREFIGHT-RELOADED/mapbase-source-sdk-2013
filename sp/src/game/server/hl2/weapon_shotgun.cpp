@@ -42,6 +42,9 @@ private:
 	bool	m_bDelayedFire1;	// Fire primary when finished reloading
 	bool	m_bDelayedFire2;	// Fire secondary when finished reloading
 
+protected:
+	int				m_iFireMode;
+
 public:
 	void	Precache( void );
 
@@ -51,12 +54,18 @@ public:
 	{
 		static Vector vitalAllyCone = VECTOR_CONE_3DEGREES;
 		static Vector cone = VECTOR_CONE_10DEGREES;
+		static Vector ironsightCone = VECTOR_CONE_3DEGREES;
 
 		if( GetOwner() && (GetOwner()->Classify() == CLASS_PLAYER_ALLY_VITAL) )
 		{
 			// Give Alyx's shotgun blasts more a more directed punch. She needs
 			// to be at least as deadly as she would be with her pistol to stay interesting (sjb)
 			return vitalAllyCone;
+		}
+
+		if (IsIronsighted())
+		{
+			return ironsightCone;
 		}
 
 		return cone;
@@ -103,7 +112,7 @@ BEGIN_DATADESC( CWeaponShotgun )
 	DEFINE_FIELD( m_bNeedPump, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_bDelayedFire1, FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_bDelayedFire2, FIELD_BOOLEAN ),
-
+	DEFINE_FIELD(m_iFireMode, FIELD_INTEGER)
 END_DATADESC()
 
 acttable_t	CWeaponShotgun::m_acttable[] = 
@@ -153,6 +162,14 @@ acttable_t	CWeaponShotgun::m_acttable[] =
 	{ ACT_RANGE_ATTACK1_LOW,		ACT_RANGE_ATTACK_SHOTGUN_LOW,		true },
 	{ ACT_RELOAD_LOW,				ACT_RELOAD_SHOTGUN_LOW,				false },
 	{ ACT_GESTURE_RELOAD,			ACT_GESTURE_RELOAD_SHOTGUN,			false },
+	{ ACT_HL2MP_IDLE,				ACT_HL2MP_IDLE_SHOTGUN,				false },
+	{ ACT_HL2MP_RUN,				ACT_HL2MP_RUN_SHOTGUN,				false },
+	{ ACT_HL2MP_IDLE_CROUCH,		ACT_HL2MP_IDLE_CROUCH_SHOTGUN,		false },
+	{ ACT_HL2MP_WALK_CROUCH,		ACT_HL2MP_WALK_CROUCH_SHOTGUN,		false },
+	{ ACT_HL2MP_GESTURE_RANGE_ATTACK,		ACT_HL2MP_GESTURE_RANGE_ATTACK_SHOTGUN,		false },
+	{ ACT_HL2MP_GESTURE_RELOAD,		ACT_HL2MP_GESTURE_RELOAD_SHOTGUN,	false },
+	{ ACT_HL2MP_JUMP,				ACT_HL2MP_JUMP_SHOTGUN,				false },
+	{ ACT_RANGE_ATTACK1,			ACT_RANGE_ATTACK_SHOTGUN,			false },
 };
 
 IMPLEMENT_ACTTABLE(CWeaponShotgun);
@@ -272,7 +289,12 @@ float CWeaponShotgun::GetFireRate()
 		return 0.8f;
 	}
 
-	return 0.7;
+	if (m_iFireMode == 1 && GetOwner()->Classify() == CLASS_PLAYER)
+	{
+		return 0.3f;
+	}
+
+	return 0.7f;
 }
 
 //-----------------------------------------------------------------------------
@@ -298,9 +320,16 @@ bool CWeaponShotgun::StartReload( void )
 	//NOTENOTE: This is kinda lame because the player doesn't get strong feedback on when the reload has finished,
 	//			without the pump.  Technically, it's incorrect, but it's good for feedback...
 
-	if (m_iClip1 <= 0)
+	if (m_iFireMode == 0)
 	{
-		m_bNeedPump = true;
+		if (m_iClip1 <= 0)
+		{
+			m_bNeedPump = true;
+		}
+	}
+	else
+	{
+		m_bNeedPump = false;
 	}
 
 	int j = MIN(1, pOwner->GetAmmoCount(m_iPrimaryAmmoType));
@@ -317,6 +346,9 @@ bool CWeaponShotgun::StartReload( void )
 	m_flNextPrimaryAttack = gpGlobals->curtime + SequenceDuration();
 
 	m_bInReload = true;
+
+	DisableIronsights();
+
 	return true;
 }
 
@@ -402,7 +434,14 @@ void CWeaponShotgun::FillClip( void )
 		if ( Clip1() < GetMaxClip1() )
 		{
 			m_iClip1++;
-			pOwner->RemoveAmmo( 1, m_iPrimaryAmmoType );
+
+			if (pOwner->IsPlayer())
+			{
+				if (!((CBasePlayer *)pOwner)->m_iPerkInfiniteAmmo == 1)
+				{
+					pOwner->RemoveAmmo(1, m_iPrimaryAmmoType);
+				}
+			}
 		}
 	}
 }
@@ -414,6 +453,9 @@ void CWeaponShotgun::FillClip( void )
 //-----------------------------------------------------------------------------
 void CWeaponShotgun::Pump( void )
 {
+	if (m_iFireMode == 1)
+		return;
+
 	CBaseCombatCharacter *pOwner  = GetOwner();
 
 	if ( pOwner == NULL )
@@ -440,7 +482,14 @@ void CWeaponShotgun::DryFire( void )
 	WeaponSound(EMPTY);
 	SendWeaponAnim( ACT_VM_DRYFIRE );
 	
-	m_flNextPrimaryAttack = gpGlobals->curtime + SequenceDuration();
+	if (m_iFireMode == 1)
+	{
+		m_flNextPrimaryAttack = gpGlobals->curtime + GetViewModelSequenceDuration() + GetFireRate();
+	}
+	else
+	{
+		m_flNextPrimaryAttack = gpGlobals->curtime + GetViewModelSequenceDuration();
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -468,8 +517,20 @@ void CWeaponShotgun::PrimaryAttack( void )
 	// player "shoot" animation
 	pPlayer->SetAnimation( PLAYER_ATTACK1 );
 
+	if (GetWpnData().m_bUseMuzzleSmoke)
+	{
+		DispatchParticleEffect("weapon_muzzle_smoke", PATTACH_POINT_FOLLOW, pPlayer->GetViewModel(), "muzzle", true);
+	}
+
 	// Don't fire again until fire animation has completed
-	m_flNextPrimaryAttack = gpGlobals->curtime + SequenceDuration();
+	if (m_iFireMode == 1)
+	{
+		m_flNextPrimaryAttack = gpGlobals->curtime + GetViewModelSequenceDuration() + GetFireRate();
+	}
+	else
+	{
+		m_flNextPrimaryAttack = gpGlobals->curtime + GetViewModelSequenceDuration();
+	}
 	m_iClip1 -= 1;
 
 	Vector	vecSrc		= pPlayer->Weapon_ShootPosition( );
@@ -490,10 +551,17 @@ void CWeaponShotgun::PrimaryAttack( void )
 		pPlayer->SetSuitUpdate("!HEV_AMO0", FALSE, 0); 
 	}
 
-	if( m_iClip1 )
+	if (m_iFireMode == 0)
 	{
-		// pump so long as some rounds are left.
-		m_bNeedPump = true;
+		if( m_iClip1 )
+		{
+			// pump so long as some rounds are left.
+			m_bNeedPump = true;
+		}
+	}
+	else
+	{
+		m_bNeedPump = false;
 	}
 
 	m_iPrimaryAttacks++;
@@ -526,8 +594,20 @@ void CWeaponShotgun::SecondaryAttack( void )
 	// player "shoot" animation
 	pPlayer->SetAnimation( PLAYER_ATTACK1 );
 
+	if (GetWpnData().m_bUseMuzzleSmoke)
+	{
+		DispatchParticleEffect("weapon_muzzle_smoke", PATTACH_POINT_FOLLOW, pPlayer->GetViewModel(), "muzzle", true);
+	}
+
 	// Don't fire again until fire animation has completed
-	m_flNextPrimaryAttack = gpGlobals->curtime + SequenceDuration();
+	if (m_iFireMode == 1)
+	{
+		m_flNextPrimaryAttack = gpGlobals->curtime + GetViewModelSequenceDuration() + GetFireRate();
+	}
+	else
+	{
+		m_flNextPrimaryAttack = gpGlobals->curtime + GetViewModelSequenceDuration();
+	}
 	m_iClip1 -= 2;	// Shotgun uses same clip for primary and secondary attacks
 
 	Vector vecSrc	 = pPlayer->Weapon_ShootPosition();
@@ -551,10 +631,17 @@ void CWeaponShotgun::SecondaryAttack( void )
 		pPlayer->SetSuitUpdate("!HEV_AMO0", FALSE, 0); 
 	}
 
-	if( m_iClip1 )
+	if (m_iFireMode == 0)
 	{
-		// pump so long as some rounds are left.
-		m_bNeedPump = true;
+		if( m_iClip1 )
+		{
+			// pump so long as some rounds are left.
+			m_bNeedPump = true;
+		}
+	}
+	else
+	{
+		m_bNeedPump = false;
 	}
 
 	m_iSecondaryAttacks++;
@@ -569,6 +656,66 @@ void CWeaponShotgun::ItemPostFrame( void )
 	CBasePlayer *pOwner = ToBasePlayer( GetOwner() );
 	if (!pOwner)
 	{
+		return;
+	}
+
+	if (pOwner->m_afButtonPressed & IN_ATTACK3)
+	{
+		if (m_iFireMode == 0)
+		{
+			CFmtStr hint;
+			hint.sprintf("#Valve_Shotgun_SemiAuto");
+			pOwner->ShowLevelMessage(hint.Access());
+			m_iFireMode = 1;
+			WeaponSound(EMPTY);
+		}
+		else if (m_iFireMode == 1)
+		{
+			CFmtStr hint;
+			hint.sprintf("#Valve_Shotgun_Pump");
+			pOwner->ShowLevelMessage(hint.Access());
+			m_iFireMode = 0;
+			WeaponSound(EMPTY);
+		}
+	}
+
+	ConVar *viewmodel_lower_on_sprint = cvar->FindVar("viewmodel_lower_on_sprint");
+
+	if (!bLowered && (pOwner->m_nButtons & IN_SPEED) && !IsIronsighted() && viewmodel_lower_on_sprint->GetBool())
+	{
+		bLowered = true;
+		SendWeaponAnim(ACT_VM_IDLE_LOWERED);
+		m_fLoweredReady = gpGlobals->curtime;
+		m_flNextPrimaryAttack = m_fLoweredReady;
+	}
+	else if (bLowered && !(pOwner->m_nButtons & IN_SPEED) && !IsIronsighted() && viewmodel_lower_on_sprint->GetBool())
+	{
+		bLowered = false;
+		SendWeaponAnim(ACT_VM_IDLE);
+		m_fLoweredReady = gpGlobals->curtime;
+		m_flNextPrimaryAttack = m_fLoweredReady;
+	}
+
+	if (bLowered && !IsIronsighted() && viewmodel_lower_on_sprint->GetBool())
+	{
+		if (gpGlobals->curtime > m_fLoweredReady)
+		{
+			bLowered = true;
+			SendWeaponAnim(ACT_VM_IDLE_LOWERED);
+			m_fLoweredReady = gpGlobals->curtime;
+			m_flNextPrimaryAttack = m_fLoweredReady;
+		}
+		return;
+	}
+	else if (bLowered && !IsIronsighted() && viewmodel_lower_on_sprint->GetBool())
+	{
+		if (gpGlobals->curtime > m_fLoweredReady)
+		{
+			bLowered = false;
+			SendWeaponAnim(ACT_VM_IDLE);
+			m_fLoweredReady = gpGlobals->curtime;
+			m_flNextPrimaryAttack = m_fLoweredReady;
+		}
 		return;
 	}
 
@@ -729,7 +876,6 @@ void CWeaponShotgun::ItemPostFrame( void )
 		WeaponIdle( );
 		return;
 	}
-
 }
 
 
@@ -749,6 +895,7 @@ CWeaponShotgun::CWeaponShotgun( void )
 	m_fMaxRange1		= 500;
 	m_fMinRange2		= 0.0;
 	m_fMaxRange2		= 200;
+	m_iFireMode			 = 0;
 }
 
 //-----------------------------------------------------------------------------

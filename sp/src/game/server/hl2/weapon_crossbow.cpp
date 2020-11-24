@@ -24,6 +24,7 @@
 #include "rumble_shared.h"
 #include "gamestats.h"
 #include "decals.h"
+#include "hl2_player.h"
 
 #ifdef PORTAL
 	#include "portal_util_shared.h"
@@ -619,6 +620,8 @@ private:
 	bool				m_bMustReload;
 };
 
+IMPLEMENT_ACTTABLE(CWeaponCrossbow);
+
 LINK_ENTITY_TO_CLASS( weapon_crossbow, CWeaponCrossbow );
 
 PRECACHE_WEAPON_REGISTER( weapon_crossbow );
@@ -686,6 +689,15 @@ acttable_t	CWeaponCrossbow::m_acttable[] =
 	{ ACT_RANGE_AIM_LOW,			ACT_RANGE_AIM_SMG1_LOW,			false },
 	{ ACT_RELOAD_LOW,				ACT_RELOAD_SMG1_LOW,			false },
 	{ ACT_GESTURE_RELOAD,			ACT_GESTURE_RELOAD_SMG1,		true },
+	
+	{ ACT_HL2MP_IDLE, ACT_HL2MP_IDLE_CROSSBOW, false },
+	{ ACT_HL2MP_RUN, ACT_HL2MP_RUN_CROSSBOW, false },
+	{ ACT_HL2MP_IDLE_CROUCH, ACT_HL2MP_IDLE_CROUCH_CROSSBOW, false },
+	{ ACT_HL2MP_WALK_CROUCH, ACT_HL2MP_WALK_CROUCH_CROSSBOW, false },
+	{ ACT_HL2MP_GESTURE_RANGE_ATTACK, ACT_HL2MP_GESTURE_RANGE_ATTACK_CROSSBOW, false },
+	{ ACT_HL2MP_GESTURE_RELOAD, ACT_HL2MP_GESTURE_RELOAD_CROSSBOW, false },
+	{ ACT_HL2MP_JUMP, ACT_HL2MP_JUMP_CROSSBOW, false },
+	{ ACT_RANGE_ATTACK1, ACT_RANGE_ATTACK_SHOTGUN, false },
 };
 
 IMPLEMENT_ACTTABLE(CWeaponCrossbow);
@@ -800,9 +812,12 @@ void CWeaponCrossbow::CheckZoomToggle( void )
 {
 	CBasePlayer *pPlayer = ToBasePlayer( GetOwner() );
 	
-	if ( pPlayer->m_afButtonPressed & IN_ATTACK2 )
+	if (!IsIronsighted())
 	{
+		if (pPlayer->m_afButtonPressed & IN_ATTACK2)
+		{
 			ToggleZoom();
+		}
 	}
 }
 

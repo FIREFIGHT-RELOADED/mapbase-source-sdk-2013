@@ -14,6 +14,7 @@
 #include "IEffects.h"
 #include "engine/IEngineSound.h"
 #include "weapon_flaregun.h"
+#include "hl2_gamerules.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -46,6 +47,7 @@
 // ================================================================ //
 #endif
 
+extern ConVar sk_plr_dmg_flare_round;
 
 #define	FLARE_LAUNCH_SPEED	1500
 
@@ -411,22 +413,12 @@ void CFlare::FlareTouch( CBaseEntity *pOther )
 	//If the flare hit a person or NPC, do damage here.
 	if ( pOther && pOther->m_takedamage )
 	{
-		/*
-			The Flare is the iRifle round right now. No damage, just ignite. (sjb)
-
 		//Damage is a function of how fast the flare is flying.
-		int iDamage = GetAbsVelocity().Length() / 50.0f;
-
-		if ( iDamage < 5 )
-		{
-			//Clamp minimum damage
-			iDamage = 5;
-		}
+		int iDamage = sk_plr_dmg_flare_round.GetInt();
 
 		//Use m_pOwner, not GetOwnerEntity()
 		pOther->TakeDamage( CTakeDamageInfo( this, m_pOwner, iDamage, (DMG_BULLET|DMG_BURN) ) );
 		m_flNextDamage = gpGlobals->curtime + 1.0f;
-		*/
 
 		CBaseAnimating *pAnim;
 
@@ -680,13 +672,39 @@ void CFlare::AddToActiveFlares( void )
 	}
 }
 
-#if 0
-
 IMPLEMENT_SERVERCLASS_ST(CFlaregun, DT_Flaregun)
 END_SEND_TABLE()
 
 LINK_ENTITY_TO_CLASS( weapon_flaregun, CFlaregun );
 PRECACHE_WEAPON_REGISTER( weapon_flaregun );
+
+acttable_t	CFlaregun::m_acttable[] =
+{
+	{ ACT_IDLE, ACT_IDLE_PISTOL, true },
+	{ ACT_IDLE_ANGRY, ACT_IDLE_ANGRY_PISTOL, true },
+	{ ACT_RANGE_ATTACK1, ACT_RANGE_ATTACK_PISTOL, true },
+	{ ACT_RELOAD, ACT_RELOAD_PISTOL, true },
+	{ ACT_WALK_AIM, ACT_WALK_AIM_PISTOL, true },
+	{ ACT_RUN_AIM, ACT_RUN_AIM_PISTOL, true },
+	{ ACT_GESTURE_RANGE_ATTACK1, ACT_GESTURE_RANGE_ATTACK_PISTOL, true },
+	{ ACT_RELOAD_LOW, ACT_RELOAD_PISTOL_LOW, false },
+	{ ACT_RANGE_ATTACK1_LOW, ACT_RANGE_ATTACK_PISTOL_LOW, false },
+	{ ACT_COVER_LOW, ACT_COVER_PISTOL_LOW, false },
+	{ ACT_RANGE_AIM_LOW, ACT_RANGE_AIM_PISTOL_LOW, false },
+	{ ACT_GESTURE_RELOAD, ACT_GESTURE_RELOAD_PISTOL, false },
+	{ ACT_WALK, ACT_WALK_PISTOL, false },
+	{ ACT_RUN, ACT_RUN_PISTOL, false },
+	{ ACT_HL2MP_IDLE, ACT_HL2MP_IDLE_PISTOL, false },
+	{ ACT_HL2MP_RUN, ACT_HL2MP_RUN_PISTOL, false },
+	{ ACT_HL2MP_IDLE_CROUCH, ACT_HL2MP_IDLE_CROUCH_PISTOL, false },
+	{ ACT_HL2MP_WALK_CROUCH, ACT_HL2MP_WALK_CROUCH_PISTOL, false },
+	{ ACT_HL2MP_GESTURE_RANGE_ATTACK, ACT_HL2MP_GESTURE_RANGE_ATTACK_PISTOL, false },
+	{ ACT_HL2MP_GESTURE_RELOAD, ACT_HL2MP_GESTURE_RELOAD_PISTOL, false },
+	{ ACT_HL2MP_JUMP, ACT_HL2MP_JUMP_PISTOL, false },
+	{ ACT_RANGE_ATTACK1, ACT_RANGE_ATTACK_PISTOL, false },
+};
+
+IMPLEMENT_ACTTABLE(CFlaregun);
 
 //-----------------------------------------------------------------------------
 // Purpose: Precache
@@ -719,7 +737,7 @@ void CFlaregun::PrimaryAttack( void )
 		return;
 	}
 
-	m_iClip1 = m_iClip1 - 1;
+	m_iClip1--;
 
 	SendWeaponAnim( ACT_VM_PRIMARYATTACK );
 	pOwner->m_flNextAttack = gpGlobals->curtime + 1;
@@ -737,42 +755,3 @@ void CFlaregun::PrimaryAttack( void )
 	WeaponSound( SINGLE );
 }
 
-//-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
-void CFlaregun::SecondaryAttack( void )
-{
-	CBasePlayer *pOwner = ToBasePlayer( GetOwner() );
-	
-	if ( pOwner == NULL )
-		return;
-
-	if ( m_iClip1 <= 0 )
-	{
-		SendWeaponAnim( ACT_VM_DRYFIRE );
-		pOwner->m_flNextAttack = gpGlobals->curtime + SequenceDuration();
-		return;
-	}
-
-	m_iClip1 = m_iClip1 - 1;
-
-	SendWeaponAnim( ACT_VM_PRIMARYATTACK );
-	pOwner->m_flNextAttack = gpGlobals->curtime + 1;
-
-	CFlare *pFlare = CFlare::Create( pOwner->Weapon_ShootPosition(), pOwner->EyeAngles(), pOwner, FLARE_DURATION );
-
-	if ( pFlare == NULL )
-		return;
-
-	Vector forward;
-	pOwner->EyeVectors( &forward );
-
-	pFlare->SetAbsVelocity( forward * 500 );
-	pFlare->SetGravity(1.0f);
-	pFlare->SetFriction( 0.85f );
-	pFlare->SetMoveType( MOVETYPE_FLYGRAVITY, MOVECOLLIDE_FLY_BOUNCE );
-
-	WeaponSound( SINGLE );
-}
-
-#endif

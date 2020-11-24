@@ -19,6 +19,8 @@
 #include "iservervehicle.h"
 #include "items.h"
 #include "hl2_gamerules.h"
+#include "gib.h"
+#include "weapon_physcannon.h"
 #ifdef MAPBASE
 #include "grenade_frag.h"
 #include "mapbase/GlobalStrings.h"
@@ -34,8 +36,7 @@
 #define SF_METROPOLICE_ARREST_ENEMY			0x00200000
 #define SF_METROPOLICE_NO_FAR_STITCH		0x00400000
 #define SF_METROPOLICE_NO_MANHACK_DEPLOY	0x00800000
-#define SF_METROPOLICE_ALLOWED_TO_RESPOND	0x01000000
-#define SF_METROPOLICE_MID_RANGE_ATTACK		0x02000000
+//2 other spawnflags are in the h file.
 
 #define METROPOLICE_MID_RANGE_ATTACK_RANGE	3500.0f
 
@@ -123,12 +124,14 @@ ConVar	metropolice_chase_use_follow( "metropolice_chase_use_follow", "0" );
 ConVar  metropolice_move_and_melee("metropolice_move_and_melee", "1" );
 ConVar  metropolice_charge("metropolice_charge", "1" );
 
+ConVar	metropolice_spawnwithmanhacks("metropolice_spawnwithmanhacks", "1", FCVAR_ARCHIVE);
+
 #ifdef MAPBASE
 ConVar	metropolice_new_component_behavior("metropolice_new_component_behavior", "1");
 #endif
 
 // How many clips of pistol ammo a metropolice carries.
-#define METROPOLICE_NUM_CLIPS			5
+#define METROPOLICE_NUM_CLIPS			10
 #define METROPOLICE_BURST_RELOAD_COUNT	20
 
 int AE_METROPOLICE_BATON_ON;
@@ -544,7 +547,7 @@ void CNPC_MetroPolice::PrescheduleThink( void )
 	m_bPlayerIsNear = false;
 	if ( PlayerIsCriminal() == false )
 	{
-		CBasePlayer *pPlayer = UTIL_PlayerByIndex( 1 );
+		CBasePlayer *pPlayer = UTIL_GetNearestPlayer(GetAbsOrigin());
 		
 		if ( pPlayer && ( pPlayer->WorldSpaceCenter() - WorldSpaceCenter() ).LengthSqr() < (128*128) )
 		{
@@ -637,6 +640,16 @@ void CNPC_MetroPolice::Precache( void )
 #endif
 
 	PrecacheModel( STRING( GetModelName() ) );
+	PrecacheModel("models/gibs/police_beheaded.mdl");
+
+	//GIBS!
+	PrecacheModel("models/gibs/police_head.mdl");
+	PrecacheModel("models/gibs/police_left_arm.mdl");
+	PrecacheModel("models/gibs/police_right_arm.mdl");
+	PrecacheModel("models/gibs/police_torso.mdl");
+	PrecacheModel("models/gibs/police_pelvis.mdl");
+	PrecacheModel("models/gibs/police_left_leg.mdl");
+	PrecacheModel("models/gibs/police_right_leg.mdl");
 
 	UTIL_PrecacheOther( "npc_manhack" );
 
@@ -787,7 +800,27 @@ void CNPC_MetroPolice::Spawn( void )
 
 	SetUse( &CNPC_MetroPolice::PrecriminalUse );
 
-	// Start us with a visible manhack if we have one
+	//Give him a random number of manhacks on spawn.
+	if (metropolice_spawnwithmanhacks.GetBool())
+	{
+		if (g_pGameRules->IsSkillLevel(SKILL_HARD))
+		{
+			m_iManhacks = random->RandomInt(2, 3);
+		}
+		else if (g_pGameRules->IsSkillLevel(SKILL_VERYHARD))
+		{
+			m_iManhacks = random->RandomInt(4, 6);
+		}
+		else if (g_pGameRules->IsSkillLevel(SKILL_NIGHTMARE))
+		{
+			m_iManhacks = random->RandomInt(8, 12);
+		}
+		else
+		{
+			m_iManhacks = random->RandomInt(0, 2);
+		}
+	}
+
 	if ( m_iManhacks )
 	{
 		SetBodygroup( METROPOLICE_BODYGROUP_MANHACK, true );
@@ -3635,6 +3668,95 @@ void CNPC_MetroPolice::ReleaseManhack( void )
 //-----------------------------------------------------------------------------
 void CNPC_MetroPolice::Event_Killed( const CTakeDamageInfo &info )
 {
+	if (!(g_Language.GetInt() == LANGUAGE_GERMAN || UTIL_IsLowViolence()) && info.GetDamageType() & (DMG_BLAST | DMG_CRUSH) && !(info.GetDamageType() & (DMG_DISSOLVE)) && !PlayerHasMegaPhysCannon())
+	{
+		Vector vecDamageDir = info.GetDamageForce();
+		SpawnBlood(GetAbsOrigin(), g_vecAttackDir, BloodColor(), info.GetDamage());
+		DispatchParticleEffect("smod_blood_gib_r", GetAbsOrigin(), GetAbsAngles(), this);
+		EmitSound("Gore.Headshot");
+		float flFadeTime = 25.0;
+
+		CGib::SpawnSpecificGibs(this, 1, 750, 1500, "models/gibs/police_head.mdl", flFadeTime);
+
+		Vector vecRagForce;
+		vecRagForce.x = random->RandomFloat(-400, 400);
+		vecRagForce.y = random->RandomFloat(-400, 400);
+		vecRagForce.z = random->RandomFloat(0, 250);
+
+		Vector vecRagDmgForce = (vecRagForce + vecDamageDir);
+
+		CBaseEntity *pLeftArmGib = CreateRagGib(this, "models/gibs/police_left_arm.mdl", GetAbsOrigin(), GetAbsAngles(), vecRagDmgForce, flFadeTime, IsOnFire());
+		if (pLeftArmGib)
+		{
+			color32 color = pLeftArmGib->GetRenderColor();
+			pLeftArmGib->SetRenderColor(color.r, color.g, color.b, color.a);
+		}
+
+		CBaseEntity *pRightArmGib = CreateRagGib(this, "models/gibs/police_right_arm.mdl", GetAbsOrigin(), GetAbsAngles(), vecRagDmgForce, flFadeTime, IsOnFire());
+		if (pRightArmGib)
+		{
+			color32 color = pRightArmGib->GetRenderColor();
+			pRightArmGib->SetRenderColor(color.r, color.g, color.b, color.a);
+		}
+
+		CBaseEntity *pTorsoGib = CreateRagGib(this, "models/gibs/police_torso.mdl", GetAbsOrigin(), GetAbsAngles(), vecRagDmgForce, flFadeTime, IsOnFire());
+		if (pTorsoGib)
+		{
+			color32 color = pTorsoGib->GetRenderColor();
+			pTorsoGib->SetRenderColor(color.r, color.g, color.b, color.a);
+		}
+
+		CBaseEntity *pPelvisGib = CreateRagGib(this, "models/gibs/police_pelvis.mdl", GetAbsOrigin(), GetAbsAngles(), vecRagDmgForce, flFadeTime, IsOnFire());
+		if (pPelvisGib)
+		{
+			color32 color = pPelvisGib->GetRenderColor();
+			pPelvisGib->SetRenderColor(color.r, color.g, color.b, color.a);
+		}
+
+		CBaseEntity *pLeftLegGib = CreateRagGib(this, "models/gibs/police_left_leg.mdl", GetAbsOrigin(), GetAbsAngles(), vecRagDmgForce, flFadeTime, IsOnFire());
+		if (pLeftLegGib)
+		{
+			color32 color = pLeftLegGib->GetRenderColor();
+			pLeftLegGib->SetRenderColor(color.r, color.g, color.b, color.a);
+		}
+
+		CBaseEntity *pRightLegGib = CreateRagGib(this, "models/gibs/police_right_leg.mdl", GetAbsOrigin(), GetAbsAngles(), vecRagDmgForce, flFadeTime, IsOnFire());
+		if (pRightLegGib)
+		{
+			color32 color = pRightLegGib->GetRenderColor();
+			pRightLegGib->SetRenderColor(color.r, color.g, color.b, color.a);
+		}
+
+		//now add smaller gibs.
+		CGib::SpawnSpecificGibs(this, 3, 750, 1500, "models/gibs/pgib_p3.mdl", flFadeTime);
+		CGib::SpawnSpecificGibs(this, 3, 750, 1500, "models/gibs/pgib_p4.mdl", flFadeTime);
+
+		Vector forceVector = CalcDamageForceVector(info);
+
+		// Drop any weapon that I own
+		if (m_hActiveWeapon)
+		{
+			if (VPhysicsGetObject())
+			{
+				Vector weaponForce = forceVector * VPhysicsGetObject()->GetInvMass();
+				Weapon_Drop(m_hActiveWeapon, NULL, &weaponForce);
+			}
+			else
+			{
+				Weapon_Drop(m_hActiveWeapon);
+			}
+		}
+
+		if (info.GetAttacker()->IsPlayer())
+		{
+			((CSingleplayRules*)GameRules())->NPCKilled(this, info);
+		}
+
+		UTIL_Remove(this);
+		SetThink(NULL);
+		return;
+	}
+
 	// Release the manhack if we're in the middle of deploying him
 	if ( m_hManhack && m_hManhack->IsAlive() )
 	{
@@ -4630,7 +4752,7 @@ void CNPC_MetroPolice::AnnounceHarrassment( void )
 //-----------------------------------------------------------------------------
 void CNPC_MetroPolice::IncrementPlayerCriminalStatus( void )
 {
-	CBasePlayer *pPlayer = UTIL_PlayerByIndex( 1 );
+	CBasePlayer *pPlayer = UTIL_GetNearestPlayer(GetAbsOrigin());
 
 	if ( pPlayer )
 	{
@@ -4682,9 +4804,6 @@ float CNPC_MetroPolice::GetIdealAccel( void ) const
 //-----------------------------------------------------------------------------
 void CNPC_MetroPolice::AdministerJustice( void )
 {
-	if ( !AI_IsSinglePlayer() )
-		return;
-
 	// If we're allowed to chase the player, do so. Otherwise, just threaten.
 	if ( !IsInAScript() && (m_NPCState != NPC_STATE_SCRIPT) && HasSpawnFlags( SF_METROPOLICE_ALLOWED_TO_RESPOND ) )
 	{
@@ -4696,7 +4815,9 @@ void CNPC_MetroPolice::AdministerJustice( void )
 		m_flChasePlayerTime = gpGlobals->curtime + RandomFloat( 3, 7 );
 
 		// Attack the target
-		CBasePlayer *pPlayer = UTIL_PlayerByIndex(1);
+		CBasePlayer *pPlayer = UTIL_GetNearestVisiblePlayer(this);
+		if (!pPlayer)
+			pPlayer = UTIL_GetNearestPlayer(GetAbsOrigin());
 		SetEnemy( pPlayer );
 		SetState( NPC_STATE_COMBAT );
 		UpdateEnemyMemory( pPlayer, pPlayer->GetAbsOrigin() );
@@ -4719,8 +4840,8 @@ void CNPC_MetroPolice::AdministerJustice( void )
 				CNPC_MetroPolice *pNPC = assert_cast<CNPC_MetroPolice*>(ppAIs[i]);
 				if ( pNPC->HasSpawnFlags( SF_METROPOLICE_ALLOWED_TO_RESPOND ) )
 				{
-					// Is he within site & range?
-					if ( FVisible(pNPC) && pNPC->FVisible( UTIL_PlayerByIndex(1) ) && 
+					CBasePlayer *pPlayer = UTIL_GetNearestVisiblePlayer(this);
+					if (pPlayer && FVisible(pNPC) && pNPC->FVisible(pPlayer) &&
 						UTIL_DistApprox( WorldSpaceCenter(), pNPC->WorldSpaceCenter() ) < 512 )
 					{
 						pNPC->AdministerJustice();
@@ -4737,7 +4858,8 @@ void CNPC_MetroPolice::AdministerJustice( void )
 //-----------------------------------------------------------------------------
 int CNPC_MetroPolice::SelectSchedule( void )
 {
-	if ( !GetEnemy() && HasCondition( COND_IN_PVS ) && AI_GetSinglePlayer() && !AI_GetSinglePlayer()->IsAlive() )
+	CBasePlayer *pPlayer = UTIL_GetNearestPlayer(GetAbsOrigin());
+	if (!GetEnemy() && HasCondition(COND_IN_PVS) && pPlayer && !pPlayer->IsAlive())
 	{
 		return SCHED_PATROL_WALK;
 	}
@@ -4984,7 +5106,79 @@ int CNPC_MetroPolice::SelectSchedule( void )
 		return SCHED_METROPOLICE_RETURN_TO_PRECHASE;
 	}
 
+	//If we are in idle, try to find the enemy by walking.
+	if (m_NPCState == NPC_STATE_IDLE || m_NPCState == NPC_STATE_ALERT)
+	{
+		return SCHED_PATROL_WALK;
+	}
+
 	return BaseClass::SelectSchedule();
+}
+
+float CNPC_MetroPolice::GetHitgroupDamageMultiplier(int iHitGroup, const CTakeDamageInfo &info)
+{
+	switch (iHitGroup)
+	{
+	case HITGROUP_HEAD:
+		if (!(g_Language.GetInt() == LANGUAGE_GERMAN || UTIL_IsLowViolence()) && g_fr_headshotgore.GetBool())
+		{
+			if ((info.GetDamageType() & (DMG_SNIPER | DMG_BUCKSHOT)) && !(info.GetDamageType() & DMG_NEVERGIB))
+			{
+				SetModel("models/gibs/police_beheaded.mdl");
+				DispatchParticleEffect("smod_headshot_r", PATTACH_POINT_FOLLOW, this, "bloodspurt", true);
+				SpawnBlood(GetAbsOrigin(), g_vecAttackDir, BloodColor(), info.GetDamage());
+				CGib::SpawnSpecificStickyGibs(this, 3, 150, 450, "models/gibs/pgib_p3.mdl", 6);
+				CGib::SpawnSpecificStickyGibs(this, 3, 150, 450, "models/gibs/pgib_p4.mdl", 6);
+				CGib::SpawnSpecificStickyGibs(this, 3, 150, 450, "models/gibs/pgib_p3.mdl", 6);
+				CGib::SpawnSpecificStickyGibs(this, 3, 150, 450, "models/gibs/pgib_p4.mdl", 6);
+				EmitSound("Gore.Headshot");
+				m_iHealth = 0;
+				Event_Killed(info);
+				g_pGameRules->iHeadshotCount += 1;
+				CBasePlayer *pPlayer = UTIL_PlayerByIndex(1);
+				if (g_fr_economy.GetBool())
+				{
+					pPlayer->AddMoney(5);
+				}
+				if (!g_fr_classic.GetBool())
+				{
+					pPlayer->AddXP(7);
+				}
+			}
+			else if ((info.GetDamageType() & (DMG_SLASH)) && !(info.GetDamageType() & DMG_NEVERGIB))
+			{
+				SetModel("models/gibs/police_beheaded.mdl");
+				DispatchParticleEffect("smod_blood_decap_r", PATTACH_POINT_FOLLOW, this, "bloodspurt", true);
+				SpawnBlood(GetAbsOrigin(), g_vecAttackDir, BloodColor(), info.GetDamage());
+				CGib::SpawnSpecificGibs(this, 1, 150, 450, "models/gibs/police_head.mdl", 6);
+				CGib::SpawnSpecificStickyGibs(this, 3, 150, 450, "models/gibs/pgib_p4.mdl", 6);
+				EmitSound("Gore.Headshot");
+				m_iHealth = 0;
+				Event_Killed(info);
+				CBasePlayer *pPlayer = UTIL_PlayerByIndex(1);
+				if (g_fr_economy.GetBool())
+				{
+					pPlayer->AddMoney(7);
+				}
+				if (!g_fr_classic.GetBool())
+				{
+					pPlayer->AddXP(9);
+				}
+			}
+			else
+			{
+				// Soldiers take double headshot damage
+				return 2.0f;
+			}
+		}
+		else
+		{
+			// Soldiers take double headshot damage
+			return 2.0f;
+		}
+	}
+
+	return BaseClass::GetHitgroupDamageMultiplier(iHitGroup, info);
 }
 
 
@@ -5881,7 +6075,7 @@ void CNPC_MetroPolice::GatherConditions( void )
 		ClearCondition( COND_METROPOLICE_PLAYER_TOO_CLOSE );
 	}
 
-	CBasePlayer *pPlayer = UTIL_PlayerByIndex( 1 );
+	CBasePlayer *pPlayer = UTIL_GetNearestPlayer(GetAbsOrigin());
 	
 	// FIXME: Player can be NULL here during level transitions.
 	if ( !pPlayer )
@@ -6018,7 +6212,7 @@ void CNPC_MetroPolice::VPhysicsCollision( int index, gamevcollisionevent_t *pEve
 
 	if ( pEvent->pObjects[otherIndex]->GetGameFlags() & FVPHYSICS_PLAYER_HELD )
 	{
-		CHL2_Player *pPlayer = dynamic_cast<CHL2_Player *>(UTIL_PlayerByIndex( 1 ));
+		CHL2_Player *pPlayer = dynamic_cast<CHL2_Player *>(UTIL_GetNearestPlayer(pHitEntity->GetAbsOrigin()));
 
 		// See if it's being held by the player
 		if ( pPlayer != NULL && pPlayer->IsHoldingEntity( pHitEntity ) )
@@ -6542,7 +6736,6 @@ DEFINE_SCHEDULE
 	SCHED_METROPOLICE_SMG_NORMAL_ATTACK,
 
 	"	Tasks"
-	"		TASK_STOP_MOVING		0"
 	"		TASK_FACE_ENEMY			0"
 	"		TASK_ANNOUNCE_ATTACK	1"	// 1 = primary attack
 	"		TASK_METROPOLICE_STOP_FIRE_BURST	0"
@@ -6568,7 +6761,6 @@ DEFINE_SCHEDULE
 	SCHED_METROPOLICE_SMG_BURST_ATTACK,
 
 	"	Tasks"
-	"		TASK_STOP_MOVING		0"
 	"		TASK_FACE_ENEMY			0"
 	"		TASK_ANNOUNCE_ATTACK	1"	// 1 = primary attack
 	"		TASK_METROPOLICE_RELOAD_FOR_BURST	1.4"
@@ -6592,7 +6784,6 @@ DEFINE_SCHEDULE
 	SCHED_METROPOLICE_AIM_STITCH_TIGHTLY,
 
 	"	Tasks"
-	"		TASK_STOP_MOVING		0"
 	"		TASK_FACE_ENEMY			0"
 	"		TASK_ANNOUNCE_ATTACK	1"	// 1 = primary attack
 	"		TASK_METROPOLICE_RELOAD_FOR_BURST	1.0"
@@ -6617,7 +6808,6 @@ DEFINE_SCHEDULE
 	SCHED_METROPOLICE_AIM_STITCH_AT_AIRBOAT,
 
 	"	Tasks"
-	"		TASK_STOP_MOVING		0"
 	"		TASK_FACE_ENEMY			0"
 	"		TASK_ANNOUNCE_ATTACK	1"	// 1 = primary attack
 	"		TASK_METROPOLICE_RELOAD_FOR_BURST		2.5"
@@ -6641,7 +6831,6 @@ DEFINE_SCHEDULE
 	SCHED_METROPOLICE_AIM_STITCH_IN_FRONT_OF_AIRBOAT,
 
 	"	Tasks"
-	"		TASK_STOP_MOVING		0"
 	"		TASK_FACE_ENEMY			0"
 	"		TASK_ANNOUNCE_ATTACK	1"	// 1 = primary attack
 	"		TASK_METROPOLICE_RELOAD_FOR_BURST		2.5"
@@ -6665,7 +6854,6 @@ DEFINE_SCHEDULE
 	SCHED_METROPOLICE_AIM_STITCH_ALONG_SIDE_OF_AIRBOAT,
 
 	"	Tasks"
-	"		TASK_STOP_MOVING		0"
 	"		TASK_FACE_ENEMY			0"
 	"		TASK_ANNOUNCE_ATTACK	1"	// 1 = primary attack
 	"		TASK_METROPOLICE_RELOAD_FOR_BURST		2.5"
@@ -6689,7 +6877,6 @@ DEFINE_SCHEDULE
 	SCHED_METROPOLICE_AIM_STITCH_BEHIND_AIRBOAT,
 
 	"	Tasks"
-	"		TASK_STOP_MOVING		0"
 	"		TASK_FACE_ENEMY			0"
 	"		TASK_ANNOUNCE_ATTACK	1"	// 1 = primary attack
 	"		TASK_METROPOLICE_RELOAD_FOR_BURST		2.5"
@@ -6812,7 +6999,6 @@ DEFINE_SCHEDULE
  SCHED_METROPOLICE_RANGE_ATTACK2,
 
  "	Tasks"
- "		TASK_STOP_MOVING					0"
  "		TASK_METROPOLICE_FACE_TOSS_DIR			0"
  "		TASK_ANNOUNCE_ATTACK				2"	// 2 = grenade
  "		TASK_PLAY_SEQUENCE					ACTIVITY:ACT_RANGE_ATTACK2"

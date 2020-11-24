@@ -38,15 +38,17 @@
 #include "mapentities.h"
 #include "RagdollBoogie.h"
 #include "physics_collisionevent.h"
+#include "hl2_gamerules.h"
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
 #define ROLLERMINE_MAX_TORQUE_FACTOR	5
 extern short g_sModelIndexWExplosion;
 
-ConVar	sk_rollermine_shock( "sk_rollermine_shock","0");
+ConVar	sk_rollermine_shock( "sk_rollermine_shock","1");
 ConVar	sk_rollermine_stun_delay("sk_rollermine_stun_delay", "1");
 ConVar	sk_rollermine_vehicle_intercept( "sk_rollermine_vehicle_intercept","1");
+ConVar	sk_rollermine_health("sk_rollermine_health", "0");
 
 enum
 {
@@ -287,6 +289,8 @@ public:
 
 	virtual unsigned int	PhysicsSolidMaskForEntity( void ) const;
 
+	virtual bool			CanBecomeServerRagdoll(void) { return false; }
+
 	void		SetRollerSkin( void );
 
 	COutputEvent m_OnPhysGunDrop;
@@ -327,6 +331,7 @@ protected:
 	float	m_flShockTime;
 	float	m_flForwardSpeed;
 	int		m_iSoundEventFlags;
+	int		m_iRollerHealth;
 	rollingsoundstate_t m_rollingSoundState;
 
 	CNetworkVar( bool, m_bIsOpen );
@@ -397,6 +402,8 @@ BEGIN_DATADESC( CNPC_RollerMine )
 	DEFINE_FIELD( m_bPowerDown,	FIELD_BOOLEAN ),
 	DEFINE_FIELD( m_flPowerDownTime,	FIELD_TIME ),
 	DEFINE_FIELD( m_flPowerDownDetonateTime,	FIELD_TIME ),
+
+	DEFINE_FIELD(m_iRollerHealth, FIELD_INTEGER),
 
 	DEFINE_PHYSPTR( m_pConstraint ),
 
@@ -564,6 +571,7 @@ void CNPC_RollerMine::Spawn( void )
 	m_flFieldOfView		= -1.0f;
 	m_flForwardSpeed	= -1200;
 	m_bloodColor		= DONT_BLEED;
+	m_iRollerHealth		= sk_rollermine_health.GetInt();
 
 	SetHullType(HULL_SMALL_CENTERED);
 
@@ -936,7 +944,9 @@ int CNPC_RollerMine::SelectSchedule( void )
 int CNPC_RollerMine::GetHackedIdleSchedule( void )
 {
 	// If we've been hacked, return to the player
-	if ( !m_bHackedByAlyx || m_bHeld )
+	// in FIREFIGHT we need to find the best path to the player to attack him.
+	//if ( !m_bHackedByAlyx || m_bHeld )
+	if (m_bHeld)
 		return SCHED_NONE;
 
 	// Are we near the player?
@@ -1873,7 +1883,7 @@ float CNPC_RollerMine::GetAttackDamageScale( CBaseEntity *pVictim )
 		if ( pVictim->MyNPCPointer() )
 		{
 			// If we don't hate the player, we're immune
-			CBasePlayer *pPlayer = UTIL_PlayerByIndex(1);
+			CBasePlayer *pPlayer = UTIL_GetNearestPlayer(GetAbsOrigin());
 			if ( pPlayer && pVictim->MyNPCPointer()->IRelationType( pPlayer ) != D_HT )
 				return 0.0;
 		}
@@ -2401,8 +2411,17 @@ void CNPC_RollerMine::OnPhysGunPickup( CBasePlayer *pPhysGunUser, PhysGunPickup_
 	// Are we just being punted?
 	if ( reason == PUNTED_BY_CANNON )
 	{
-		// Be stunned
-		m_flActiveTime = gpGlobals->curtime + GetStunDelay();
+		if (HL2GameRules()->MegaPhyscannonActive() == true)
+		{
+			SetThink(&CNPC_RollerMine::PreDetonate);
+			SetNextThink(gpGlobals->curtime + random->RandomFloat(0.1f, 0.5f));
+		}
+		else
+		{
+			// Be stunned
+			m_flActiveTime = gpGlobals->curtime + GetStunDelay();
+		}
+		
 		return;
 	}
 
@@ -2415,6 +2434,15 @@ void CNPC_RollerMine::OnPhysGunPickup( CBasePlayer *pPhysGunUser, PhysGunPickup_
 	m_bHeld = true;
 	m_RollerController.Off();
 	EmitSound( "NPC_RollerMine.Held" );
+
+	if (HL2GameRules()->MegaPhyscannonActive() == true)
+	{
+		if (g_pGameRules->IsSkillLevel(SKILL_VERYHARD) || g_pGameRules->IsSkillLevel(SKILL_NIGHTMARE))
+		{
+			SetThink(&CNPC_RollerMine::PreDetonate);
+			SetNextThink(gpGlobals->curtime + random->RandomFloat(0.1f, 0.5f));
+		}
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -2478,6 +2506,14 @@ int CNPC_RollerMine::OnTakeDamage( const CTakeDamageInfo &info )
 			m_flActiveTime = gpGlobals->curtime + GetStunDelay();
 			Hop( 300 );
 		}
+	}
+
+	m_iRollerHealth -= info.GetDamage();
+
+	if (m_iRollerHealth <= 0)
+	{
+		SetThink(&CNPC_RollerMine::PreDetonate);
+		SetNextThink(gpGlobals->curtime + random->RandomFloat(0.1f, 0.5f));
 	}
 
 	return 0;
@@ -2549,7 +2585,7 @@ void CNPC_RollerMine::Explode( void )
 		ExplosionCreate( WorldSpaceCenter(), GetLocalAngles(), this, expDamage, 128, true );
 	}
 
-	CTakeDamageInfo	info( this, this, 1, DMG_GENERIC );
+	CTakeDamageInfo	info( this, this, 1, DMG_GENERIC | DMG_REMOVENORAGDOLL );
 	Event_Killed( info );
 
 	// Remove myself a frame from now to avoid doing it in the middle of running AI

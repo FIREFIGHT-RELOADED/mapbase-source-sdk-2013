@@ -29,6 +29,7 @@
 
 
 ConVar	sk_zombie_health( "sk_zombie_health","0");
+ConVar	sk_zombie_raremoans("sk_zombie_raremoans", "50", FCVAR_CHEAT);
 
 envelopePoint_t envZombieMoanVolumeFast[] =
 {
@@ -170,7 +171,7 @@ public:
 
 protected:
 	static const char *pMoanSounds[];
-
+	static const char *pMoanRareSounds[];
 
 private:
 	CHandle< CBaseDoor > m_hBlockingDoor;
@@ -193,6 +194,13 @@ const char *CZombie::pMoanSounds[] =
 	 "NPC_BaseZombie.Moan2",
 	 "NPC_BaseZombie.Moan3",
 	 "NPC_BaseZombie.Moan4",
+};
+
+const char *CZombie::pMoanRareSounds[] =
+{
+	"NPC_BaseZombie.MoanRare1",
+	"NPC_BaseZombie.MoanRare2",
+	"NPC_BaseZombie.MoanRare3",
 };
 
 //=========================================================
@@ -271,6 +279,10 @@ void CZombie::Precache( void )
 	PrecacheScriptSound( "NPC_BaseZombie.Moan2" );
 	PrecacheScriptSound( "NPC_BaseZombie.Moan3" );
 	PrecacheScriptSound( "NPC_BaseZombie.Moan4" );
+
+	PrecacheScriptSound("NPC_BaseZombie.MoanRare1");
+	PrecacheScriptSound("NPC_BaseZombie.MoanRare2");
+	PrecacheScriptSound("NPC_BaseZombie.MoanRare3");
 }
 
 //-----------------------------------------------------------------------------
@@ -350,6 +362,11 @@ int CZombie::SelectSchedule ( void )
 	if( HasCondition( COND_PHYSICS_DAMAGE ) && !m_ActBusyBehavior.IsActive() )
 	{
 		return SCHED_FLINCH_PHYSICS;
+	}
+
+	if (m_NPCState == NPC_STATE_IDLE || m_NPCState == NPC_STATE_ALERT)
+	{
+		return SCHED_PATROL_WALK_LOOP;
 	}
 
 	return BaseClass::SelectSchedule();
@@ -439,7 +456,15 @@ void CZombie::AlertSound( void )
 //-----------------------------------------------------------------------------
 const char *CZombie::GetMoanSound( int nSound )
 {
-	return pMoanSounds[ nSound % ARRAYSIZE( pMoanSounds ) ];
+	int raremoanrandom = random->RandomInt(0, sk_zombie_raremoans.GetInt());
+	if (raremoanrandom == 0)
+	{
+		return pMoanRareSounds[nSound % ARRAYSIZE(pMoanRareSounds)];
+	}
+	else
+	{
+		return pMoanSounds[ nSound % ARRAYSIZE( pMoanSounds ) ];
+	}
 }
 
 //-----------------------------------------------------------------------------
