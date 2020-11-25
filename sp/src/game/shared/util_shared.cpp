@@ -785,6 +785,11 @@ void UTIL_Tracer( const Vector &vecStart, const Vector &vecEnd, int iEntIndex,
 
 void UTIL_BloodDrips( const Vector &origin, const Vector &direction, int color, int amount )
 {
+	if (g_pGameRules->IsMultiplayer())
+	{
+		IPredictionSystem::SuppressHostEvents(NULL);
+	}
+	
 	if ( !UTIL_ShouldShowBlood( color ) )
 		return;
 
@@ -793,12 +798,6 @@ void UTIL_BloodDrips( const Vector &origin, const Vector &direction, int color, 
 
 	if ( g_Language.GetInt() == LANGUAGE_GERMAN && color == BLOOD_COLOR_RED )
 		color = 0;
-
-	if ( g_pGameRules->IsMultiplayer() )
-	{
-		// scale up blood effect in multiplayer for better visibility
-		amount *= 5;
-	}
 
 	if ( amount > 255 )
 		amount = 255;

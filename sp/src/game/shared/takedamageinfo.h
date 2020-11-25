@@ -101,6 +101,7 @@ public:
 
 	void			AdjustPlayerDamageInflictedForSkillLevel();
 	void			AdjustPlayerDamageTakenForSkillLevel();
+	void			AdjustPlayerDamageTakenForSkillLevelCombineAce();
 
 	// Given a damage type (composed of the #defines above), fill out a string with the appropriate text.
 	// For designer debug output.

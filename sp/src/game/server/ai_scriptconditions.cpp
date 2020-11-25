@@ -485,7 +485,7 @@ void CAI_ScriptConditions::EvaluationThink()
 	int iActorsDone = 0;
 
 #ifdef HL2_DLL
-	if( AI_GetSinglePlayer()->GetFlags() & FL_NOTARGET )
+	if( UTIL_GetNearestPlayer(GetAbsOrigin())->GetFlags() & FL_NOTARGET )
 	{
 		ScrCondDbgMsg( ("%s WARNING: Player is NOTARGET. This will affect all LOS conditiosn involving the player!\n", GetDebugName()) );
 	}

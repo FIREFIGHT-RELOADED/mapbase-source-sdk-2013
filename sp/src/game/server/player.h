@@ -287,7 +287,7 @@ public:
 	// Returns true if this player wants pPlayer to be moved back in time when this player runs usercmds.
 	// Saves a lot of overhead on the server if we can cull out entities that don't need to lag compensate
 	// (like team members, entities out of our PVS, etc).
-	virtual bool			WantsLagCompensationOnEntity( const CBasePlayer	*pPlayer, const CUserCmd *pCmd, const CBitVec<MAX_EDICTS> *pEntityTransmitBits ) const;
+	virtual bool			WantsLagCompensationOnEntity(const CBaseEntity	*pEntity, const CUserCmd *pCmd, const CBitVec<MAX_EDICTS> *pEntityTransmitBits) const;
 
 	virtual void			Spawn( void );
 	virtual void			Activate( void );
@@ -304,6 +304,10 @@ public:
 	virtual void			ShowViewPortPanel( const char * name, bool bShow = true, KeyValues *data = NULL );
 
 	virtual void			PlayerDeathThink( void );
+
+	//we are only doing this just so our spectate camera still works. only problem is that the cremator 
+	//will not see the player's corpse, but it's better to cause a small bug instead of cause a major gameplay issue. -Bitl
+	virtual bool			CanBecomeServerRagdoll(void) { return false; }
 
 	virtual void			Jump( void );
 	virtual void			Duck( void );
@@ -686,6 +690,10 @@ public:
 	void					StartHintTimer( int iHintID ) { if (Hints()) Hints()->StartHintTimer( iHintID ); }
 	void					StopHintTimer( int iHintID ) { if (Hints()) Hints()->StopHintTimer( iHintID ); }
 	void					RemoveHintTimer( int iHintID ) { if (Hints()) Hints()->RemoveHintTimer( iHintID ); }
+	void					ShowLevelMessage(const char *pMessage);
+	void					ShowPerkMessage(const char *pMessage);
+
+	void					Market_SetMaxHealth();
 
 	// Accessor methods
 	int		FragCount() const		{ return m_iFrags; }
@@ -722,12 +730,23 @@ public:
 	void	IncrementDeathCount( int nCount );
 
 	void	SetArmorValue( int value );
+	void	SetMaxArmorValue(int MaxArmorValue);
+	virtual int	GetMaxArmorValue(void) { return m_MaxArmorValue; }
 	void	IncrementArmorValue( int nCount, int nMaxValue = -1 );
+
+	void	IncrementMaxArmorValue(int nCount);
+	void	IncrementArmorValueNoMax(int nCount);
+	void	IncrementMaxHealthValue(int nCount);
+	void	IncrementMaxHealthRegenValue(int nCount);
+	virtual int	GetMaxMaxHealthRegenValue(void) { return m_MaxHealthVal; }
+	void	IncrementHealthValue(int nCount);
 
 	void	SetConnected( PlayerConnectedState iConnected ) { m_iConnected = iConnected; }
 	virtual void EquipSuit( bool bPlayEffects = true );
 	virtual void RemoveSuit( void );
 	void	SetMaxSpeed( float flMaxSpeed ) { m_flMaxspeed = flMaxSpeed; }
+
+	virtual int	GetPerkValue(void) { return m_Perk; }
 
 	void	NotifyNearbyRadiationSource( float flRange );
 
@@ -840,6 +859,44 @@ public:
 		}
 	}
 
+	int GetXP() { return m_iExp; }
+	int GetMaxXP() { return m_iMaxExp; }
+	void SetMaxXP(int add = 1) { m_iMaxExp = add; }
+	void AddXP(int add = 1) 
+	{ 
+		if (m_iLevel != MAX_LEVEL)
+		{
+			m_iExp += add;
+			CheckLevel();
+		}
+	}
+
+	int GetLevel() { return m_iLevel; }
+	int GetXpToLevelUp(int level);
+	void CheckLevel();
+	virtual void LevelUp();
+	void SetLevel(int set = 1) { m_iLevel = set; }
+
+	void DeathCheckLevel();
+
+	void ResetXP() { m_iExp = 0; m_iLevel = 1; LevelUp(); } // calling LevelUp will reset max health, etc
+	void ResetXPAlt() { m_iExp = 0;}
+	void EXPLevelPenalty();
+
+	int GetMoney() { return m_iMoney; }
+	void SetMoney(int set = 1) { m_iMoney = set; }
+	void AddMoney(int add = 1) { m_iMoney += add; }
+	void RemoveMoney(int remove = 1) { m_iMoney -= remove; }
+	void ResetMoney() { m_iMoney = 0; }
+
+	void DetermineReward(void);
+
+	void Reward_GivePerk(void);
+	void Reward_GiveItem(void);
+	void Reward_GiveKashBonus(void);
+
+	void LevelUpClassic( void);
+
 private:
 	// How much of a movement time buffer can we process from this user?
 	float				m_flMovementTimeForUserCmdProcessingRemaining;
@@ -855,6 +912,11 @@ private:
 
 	int					DetermineSimulationTicks( void );
 	void				AdjustPlayerTimeBase( int simulation_ticks );
+
+	CNetworkVar(int, m_iExp);
+	CNetworkVar(int, m_iLevel);
+	CNetworkVar(int, m_iMaxExp);
+	CNetworkVar(int, m_iMoney);
 
 public:
 	
@@ -899,6 +961,8 @@ public:
 	IMPLEMENT_NETWORK_VAR_FOR_DERIVED( m_vecVelocity );
 	IMPLEMENT_NETWORK_VAR_FOR_DERIVED( m_nWaterLevel );
 	
+	float					m_fTimeLastHurt;
+	float					m_fTimeLastHealed;
 	int						m_nButtons;
 	int						m_afButtonPressed;
 	int						m_afButtonReleased;
@@ -933,6 +997,11 @@ public:
 #ifdef MAPBASE
 	bool					m_bInTriggerFall;
 #endif
+
+	int m_iPerkInfiniteAuxPower;
+	CNetworkVar(int, m_iPerkInfiniteAmmo);
+	bool m_bAlreadyHasInfiniteAuxPowerPerk;
+	bool m_bAlreadyHasInfiniteAmmoPerk;
 
 private:
 
@@ -1069,7 +1138,8 @@ private:
 	QAngle					m_vecAutoAim;
 	int						m_lastx, m_lasty;	// These are the previous update's crosshair angles, DON"T SAVE/RESTORE
 
-	int						m_iFrags;
+	//int						m_iFrags;
+	CNetworkVar(int, m_iFrags);
 	int						m_iDeaths;
 
 	float					m_flNextDecalTime;// next time this player can spray a decal
@@ -1083,11 +1153,19 @@ private:
 	// from edict_t
 	// CBasePlayer doesn't send this but CCSPlayer does.
 	CNetworkVarForDerived( int, m_ArmorValue );
+	CNetworkVarForDerived( int, m_MaxArmorValue );
+
+	CNetworkVarForDerived(int, m_MaxHealthVal);
+	CNetworkVarForDerived(int, m_MaxHealthValExtra);
+	int						m_Perk;
 	float					m_AirFinished;
 	float					m_PainFinished;
 
 	// player locking
 	int						m_iPlayerLocked;
+		
+	float					m_fRegenRate;
+	int						m_iHealthUpgrades;
 		
 protected:
 	// the player's personal view model
@@ -1133,6 +1211,7 @@ public:
 	float					m_flForwardMove;
 	float					m_flSideMove;
 	int						m_nNumCrateHudHints;
+	
 
 #ifdef MAPBASE
 	CNetworkVar( bool, m_bDrawPlayerModelExternally );

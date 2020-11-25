@@ -3360,7 +3360,7 @@ class CLogicActiveAutosave : public CLogicAutosave
 	void SaveThink()
 	{
 		CBasePlayer *pPlayer = UTIL_GetLocalPlayer();
-		if ( pPlayer )
+		if (pPlayer && gpGlobals->maxClients == 1)
 		{
 			if ( m_flStartTime < 0 )
 			{

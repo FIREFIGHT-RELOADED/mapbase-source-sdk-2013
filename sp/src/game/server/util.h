@@ -31,6 +31,7 @@
 #include "util_shared.h"
 #include "shareddefs.h"
 #include "networkvar.h"
+#include "utldict.h"
 
 struct levellist_t;
 class IServerNetworkable;
@@ -92,6 +93,9 @@ T *_CreateEntity( T *newClass, const char *className )
 
 
 // This is the glue that hooks .MAP entity class names to our CPP classes
+class IEntityFactory;
+typedef CUtlDict<IEntityFactory*, unsigned short> EntityFactoryDict_t;
+
 abstract_class IEntityFactoryDictionary
 {
 public:
@@ -100,6 +104,7 @@ public:
 	virtual void Destroy( const char *pClassName, IServerNetworkable *pNetworkable ) = 0;
 	virtual IEntityFactory *FindFactory( const char *pClassName ) = 0;
 	virtual const char *GetCannonicalName( const char *pClassName ) = 0;
+	virtual const EntityFactoryDict_t &GetFactoryDictionary() = 0;
 };
 
 IEntityFactoryDictionary *EntityFactoryDictionary();
@@ -234,26 +239,14 @@ CBasePlayer	*UTIL_PlayerByIndex( int playerIndex );
 // not useable in multiplayer - see UTIL_GetListenServerHost()
 CBasePlayer* UTIL_GetLocalPlayer( void );
 
+// helper functions added for replacing the above 
+CBasePlayer *UTIL_GetNearestPlayer(const Vector &origin);
+CBasePlayer *UTIL_GetNearestVisiblePlayer(CBaseEntity *pLooker, int mask = MASK_SOLID_BRUSHONLY);
+
 // get the local player on a listen server
 CBasePlayer *UTIL_GetListenServerHost( void );
 
-//-----------------------------------------------------------------------------
-// Purpose: Convenience function so we don't have to make this check all over
-//-----------------------------------------------------------------------------
-static CBasePlayer * UTIL_GetLocalPlayerOrListenServerHost( void )
-{
-	if ( gpGlobals->maxClients > 1 )
-	{
-		if ( engine->IsDedicatedServer() )
-		{
-			return NULL;
-		}
-
-		return UTIL_GetListenServerHost();
-	}
-
-	return UTIL_GetLocalPlayer();
-}
+CBasePlayer *UTIL_GetLocalPlayerOrListenServerHost(void);
 
 CBasePlayer* UTIL_PlayerByUserId( int userID );
 CBasePlayer* UTIL_PlayerByName( const char *name ); // not case sensitive

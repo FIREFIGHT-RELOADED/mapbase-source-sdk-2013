@@ -163,12 +163,20 @@ bool CBaseNPCMaker::HumanHullFits( const Vector &vecLocation )
 	return false;
 }
 
+#define ENTITY_INTOLERANCE	100
+
 //-----------------------------------------------------------------------------
 // Purpose: Returns whether or not it is OK to make an NPC at this instant.
 //-----------------------------------------------------------------------------
 bool CBaseNPCMaker::CanMakeNPC( bool bIgnoreSolidEntities )
 {
+	if ( gEntList.NumberOfEntities() >= (gpGlobals->maxEntities - ENTITY_INTOLERANCE) )
+		return false;
+	
 	if( ai_inhibit_spawners.GetBool() )
+		return false;
+
+	if (g_iNPCLimit >= g_fr_npclimit.GetInt() && g_fr_npclimit.GetInt() != 0)
 		return false;
 
 	if ( m_nMaxLiveChildren > 0 && m_nLiveChildren >= m_nMaxLiveChildren )
@@ -467,6 +475,7 @@ void CNPCMaker::MakeNPC( void )
 	ChildPostSpawn( pent );
 
 	m_nLiveChildren++;// count this NPC
+	g_iNPCLimit++;
 
 	if (!(m_spawnflags & SF_NPCMAKER_INF_CHILD))
 	{
@@ -534,6 +543,7 @@ void CBaseNPCMaker::DeathNotice( CBaseEntity *pVictim )
 {
 	// ok, we've gotten the deathnotice from our child, now clear out its owner if we don't want it to fade.
 	m_nLiveChildren--;
+	g_iNPCLimit--;
 
 	// If we're here, we're getting erroneous death messages from children we haven't created
 	AssertMsg( m_nLiveChildren >= 0, "npc_maker receiving child death notice but thinks has no children\n" );
@@ -663,6 +673,7 @@ CNPCSpawnDestination *CTemplateNPCMaker::FindSpawnDestination()
 		{
 			bool fValid = true;
 			Vector vecTest = pDestination->GetAbsOrigin();
+			pPlayer = UTIL_GetNearestPlayer(vecTest);
 
 			if( m_CriterionVisibility != TS_YN_DONT_CARE )
 			{
@@ -730,6 +741,7 @@ CNPCSpawnDestination *CTemplateNPCMaker::FindSpawnDestination()
 			for( int i = 0 ; i < count ; i++ )
 			{
 				Vector vecTest = pDestinations[ i ]->GetAbsOrigin();
+				pPlayer = UTIL_GetNearestPlayer(vecTest);
 				float flDist = ( vecTest - pPlayer->GetAbsOrigin() ).Length();
 
 				if ( m_iMinSpawnDistance != 0 && m_iMinSpawnDistance > flDist )

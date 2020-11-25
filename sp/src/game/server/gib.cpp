@@ -20,6 +20,7 @@
 #include "tier0/memdbgon.h"
 
 extern Vector			g_vecAttackDir;		// In globals.cpp
+#define ENTITY_INTOLERANCE	100
 
 BEGIN_DATADESC( CGib )
 
@@ -64,6 +65,11 @@ void CGib::LimitVelocity( void )
 
 void CGib::SpawnStickyGibs( CBaseEntity *pVictim, Vector vecOrigin, int cGibs )
 {
+	if ( gEntList.NumberOfEntities() >= (gpGlobals->maxEntities - ENTITY_INTOLERANCE) )
+	{
+		return;
+	}
+	
 	int i;
 
 	if ( g_Language.GetInt() == LANGUAGE_GERMAN )
@@ -117,6 +123,11 @@ void CGib::SpawnStickyGibs( CBaseEntity *pVictim, Vector vecOrigin, int cGibs )
 
 void CGib::SpawnHeadGib( CBaseEntity *pVictim )
 {
+	if ( gEntList.NumberOfEntities() >= (gpGlobals->maxEntities - ENTITY_INTOLERANCE) )
+	{
+		return;
+	}
+	
 	CGib *pGib = CREATE_ENTITY( CGib, "gib" );
 
 	if ( g_Language.GetInt() == LANGUAGE_GERMAN )
@@ -273,6 +284,11 @@ void CGib::SpawnSpecificGibs(	CBaseEntity*	pVictim,
 								const char*		cModelName,
 								float			flLifetime)
 {
+	if ( gEntList.NumberOfEntities() >= (gpGlobals->maxEntities - ENTITY_INTOLERANCE) )
+	{
+		return;
+	}
+	
 	for (int i=0;i<nNumGibs;i++)
 	{
 		CGib *pGib = CREATE_ENTITY( CGib, "gib" );
@@ -280,11 +296,71 @@ void CGib::SpawnSpecificGibs(	CBaseEntity*	pVictim,
 		pGib->m_nBody = i;
 		pGib->InitGib( pVictim, vMinVelocity, vMaxVelocity );
 		pGib->m_lifeTime = flLifetime;
+		pGib->SetTouch(&CGib::GibTouch);
 		
 		if ( pVictim != NULL )
 		{
 			pGib->SetOwnerEntity( pVictim );
 		}
+	}
+}
+
+void CGib::SpawnSpecificStickyGibs(CBaseEntity*	pVictim,
+	int				nNumGibs,
+	float			vMinVelocity,
+	float			vMaxVelocity,
+	const char*		cModelName,
+	float			flLifetime)
+{
+	if ( gEntList.NumberOfEntities() >= (gpGlobals->maxEntities - ENTITY_INTOLERANCE) )
+	{
+		return;
+	}
+	
+	for (int i = 0; i<nNumGibs; i++)
+	{
+		CGib *pGib = CREATE_ENTITY(CGib, "gib");
+		pGib->Spawn(cModelName);
+		pGib->m_nBody = i;
+		pGib->m_lifeTime = flLifetime;
+		if (pVictim != NULL)
+		{
+			Vector vecOrigin;
+			pVictim->CollisionProp()->RandomPointInBounds(vec3_origin, Vector(1, 1, 1), &vecOrigin);
+			vecOrigin.z += 1.0f;
+			pGib->SetAbsOrigin(vecOrigin);
+
+			pGib->SetLocalOrigin(
+				Vector(vecOrigin.x + random->RandomFloat(-3, 3),
+				vecOrigin.y + random->RandomFloat(-3, 3),
+				vecOrigin.z + random->RandomFloat(-3, 3)));
+
+			// make the gib fly away from the attack vector
+			Vector vecNewVelocity = g_vecAttackDir * -1;
+
+			// mix in some noise
+			vecNewVelocity.x += random->RandomFloat(-0.15, 0.15);
+			vecNewVelocity.y += random->RandomFloat(-0.15, 0.15);
+			vecNewVelocity.z += random->RandomFloat(-0.15, 0.15);
+
+			vecNewVelocity *= random->RandomFloat(vMaxVelocity, vMinVelocity);
+
+			QAngle vecAngVelocity(random->RandomFloat(250, 400), random->RandomFloat(250, 400), 0);
+			pGib->SetLocalAngularVelocity(vecAngVelocity);
+
+			// copy owner's blood color
+			pGib->SetBloodColor(pVictim->BloodColor());
+
+			pGib->AdjustVelocityBasedOnHealth(pVictim->m_iHealth, vecNewVelocity);
+			pGib->SetAbsVelocity(vecNewVelocity);
+
+			pGib->SetMoveType(MOVETYPE_FLYGRAVITY);
+			pGib->RemoveSolidFlags(FSOLID_NOT_SOLID);
+			pGib->SetCollisionBounds(vec3_origin, vec3_origin);
+			pGib->SetTouch(&CGib::StickyGibTouch);
+			pGib->SetOwnerEntity(pVictim);
+		}
+		pGib->LimitVelocity();
 	}
 }
 
@@ -295,6 +371,11 @@ void CGib::SpawnSpecificGibs(	CBaseEntity*	pVictim,
 //------------------------------------------------------------------------------
 void CGib::SpawnRandomGibs( CBaseEntity *pVictim, int cGibs, GibType_e eGibType )
 {
+	if ( gEntList.NumberOfEntities() >= (gpGlobals->maxEntities - ENTITY_INTOLERANCE) )
+	{
+		return;
+	}
+	
 	int cSplat;
 
 	for ( cSplat = 0 ; cSplat < cGibs ; cSplat++ )
@@ -525,14 +606,12 @@ void CGib::BounceGibTouch ( CBaseEntity *pOther )
 	}
 	else
 	{
-		if ( g_Language.GetInt() != LANGUAGE_GERMAN && m_cBloodDecals > 0 && m_bloodColor != DONT_BLEED )
+		if (g_Language.GetInt() != LANGUAGE_GERMAN && m_bloodColor != DONT_BLEED)
 		{
 			vecSpot = GetAbsOrigin() + Vector ( 0 , 0 , 8 );//move up a bit, and trace down.
 			UTIL_TraceLine ( vecSpot, vecSpot + Vector ( 0, 0, -24 ),  MASK_SOLID_BRUSHONLY, this, COLLISION_GROUP_NONE, &tr);
 
 			UTIL_BloodDecalTrace( &tr, m_bloodColor );
-
-			m_cBloodDecals--; 
 		}
 
 		if ( m_material != matNone && random->RandomInt(0,2) == 0 )
@@ -578,6 +657,27 @@ void CGib::StickyGibTouch ( CBaseEntity *pOther )
 }
 
 //
+// Sticky gib puts blood on the wall and stays put. 
+//
+void CGib::GibTouch(CBaseEntity *pOther)
+{
+	Vector	vecSpot;
+	trace_t tr;
+
+	SetThink(&CGib::SUB_Remove);
+	SetNextThink(gpGlobals->curtime + 10);
+
+	if (!FClassnameIs(pOther, "worldspawn"))
+	{
+		SetNextThink(gpGlobals->curtime);
+		return;
+	}
+
+	UTIL_TraceLine(GetAbsOrigin(), GetAbsOrigin() + GetAbsVelocity() * 32, MASK_SOLID_BRUSHONLY, this, COLLISION_GROUP_NONE, &tr);
+	UTIL_BloodDecalTrace(&tr, m_bloodColor);
+}
+
+//
 // Throw a chunk
 //
 void CGib::Spawn( const char *szGibModel )
@@ -611,8 +711,6 @@ void CGib::Spawn( const char *szGibModel )
     m_bForceRemove = false;
 
 	m_material = matNone;
-	m_cBloodDecals = 5;// how many blood decals this gib can place (1 per bounce until none remain). 
-
 }
 
 
@@ -630,8 +728,13 @@ void CGib::Spawn( const char *szGibModel, float flLifetime )
 
 LINK_ENTITY_TO_CLASS( gib, CGib );
 
-CBaseEntity *CreateRagGib( const char *szModel, const Vector &vecOrigin, const QAngle &vecAngles, const Vector &vecForce, float flFadeTime, bool bShouldIgnite )
+CBaseEntity *CreateRagGib(CBaseEntity *pVictim, const char *szModel, const Vector &vecOrigin, const QAngle &vecAngles, const Vector &vecForce, float flFadeTime, bool bShouldIgnite)
 {
+	if ( gEntList.NumberOfEntities() >= (gpGlobals->maxEntities - ENTITY_INTOLERANCE) )
+	{
+		return NULL;
+	}
+	
 	CRagGib *pGib;
 
 	pGib = (CRagGib*)CreateEntityByName( "raggib" );
@@ -653,18 +756,19 @@ CBaseEntity *CreateRagGib( const char *szModel, const Vector &vecOrigin, const Q
 		}
 	}
 
-	pGib->Spawn( szModel, vecOrigin, vecForce, flFadeTime );
+	pGib->Spawn(pVictim, szModel, vecOrigin, vecForce, flFadeTime);
 
 	return pGib;
 }
 
-void CRagGib::Spawn( const char *szModel, const Vector &vecOrigin, const Vector &vecForce, float flFadeTime = 0.0 )
+void CRagGib::Spawn(CBaseEntity *pVictim, const char *szModel, const Vector &vecOrigin, const Vector &vecForce, float flFadeTime = 0.0)
 {
 	SetSolid( SOLID_BBOX );
 	AddSolidFlags( FSOLID_NOT_SOLID );
 	SetModel( szModel );
 	UTIL_SetSize(this, vec3_origin, vec3_origin);
 	UTIL_SetOrigin( this, vecOrigin );
+	SetBloodColor(pVictim->BloodColor());
 	if ( !BecomeRagdollOnClient( vecForce ) )
 	{
 		AddSolidFlags( FSOLID_NOT_STANDABLE );
@@ -673,7 +777,22 @@ void CRagGib::Spawn( const char *szModel, const Vector &vecOrigin, const Vector 
 		{
 			SUB_StartFadeOut( flFadeTime );
 		}
+		SetTouch(&CRagGib::RagGibTouch);
 	}
+}
+
+void CRagGib::RagGibTouch(CBaseEntity *pOther)
+{
+	Vector	vecSpot;
+	trace_t tr;
+
+	UTIL_TraceLine(GetAbsOrigin(), GetAbsOrigin() + GetAbsVelocity() * 32, MASK_SOLID_BRUSHONLY, this, COLLISION_GROUP_NONE, &tr);
+	UTIL_BloodDecalTrace(&tr, m_bloodColor);
+}
+
+void CRagGib::SetBloodColor(int nBloodColor)
+{
+	m_bloodColor = nBloodColor;
 }
 
 LINK_ENTITY_TO_CLASS( raggib, CRagGib );

@@ -75,7 +75,8 @@ static inline char const *SafeString( char const *pStr )
 
 static CBaseGameStats s_GameStats_Singleton;
 CBaseGameStats *gamestats = &s_GameStats_Singleton; //start out pointing at the basic version which does nothing by default
-extern ConVar skill;
+//extern ConVar skill;
+extern ConVar g_skill;
 void OverWriteCharsWeHate( char *pStr );
 
 bool StatsTrackingIsFullyEnabled( void );
@@ -281,7 +282,7 @@ void CBaseGameStats::Event_LevelInit( void )
 
 		SetHDRStatistic( gamestatsuploader->IsHDREnabled() );
 
-		SetSkillStatistic( skill.GetInt() );
+		SetSkillStatistic(g_skill.GetInt());
 		SetSteamStatistic( filesystem->IsSteam() );
 		SetCyberCafeStatistic( gamestatsuploader->IsCyberCafeUser() );
 	}

@@ -42,6 +42,12 @@ ConVar log_verbose_enable( "log_verbose_enable", "0", FCVAR_GAMEDLL, "Set to 1 t
 ConVar log_verbose_interval( "log_verbose_interval", "3.0", FCVAR_GAMEDLL, "Determines the interval (in seconds) for the verbose server log." );
 #endif // CLIENT_DLL
 
+ConVar g_skill("g_skill", "0", FCVAR_ARCHIVE | FCVAR_REPLICATED);
+ConVar g_fr_classic("g_fr_classic", "0", FCVAR_ARCHIVE | FCVAR_REPLICATED);
+ConVar g_fr_headshotgore("g_fr_headshotgore", "1", FCVAR_ARCHIVE | FCVAR_REPLICATED);
+ConVar g_fr_economy("g_fr_economy", "1", FCVAR_ARCHIVE | FCVAR_REPLICATED);
+ConVar g_fr_npclimit("g_fr_npclimit", "0", FCVAR_ARCHIVE | FCVAR_REPLICATED);
+
 static CViewVectors g_DefaultViewVectors(
 	Vector( 0, 0, 64 ),			//VEC_VIEW (m_vView)
 								
@@ -266,9 +272,10 @@ void CGameRules::RefreshSkillData ( bool forceUpdate )
 	char	szExec[256];
 #endif 
 
-	ConVarRef skill( "skill" );
+	//ConVarRef skill( "skill" );
 
-	SetSkillLevel( skill.IsValid() ? skill.GetInt() : 1 );
+	//SetSkillLevel(skill.IsValid() ? skill.GetInt() : 1);
+	SetSkillLevel(g_skill.GetInt());
 
 #ifdef HL2_DLL
 	// HL2 current only uses one skill config file that represents MEDIUM skill level and
@@ -290,6 +297,10 @@ void CGameRules::RefreshSkillData ( bool forceUpdate )
 #endif // CLIENT_DLL
 }
 
+int CGameRules::GetHeadshotCount()
+{
+	return iHeadshotCount;
+}
 
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
@@ -571,12 +582,12 @@ void CGameRules::FrameUpdatePostEntityThink()
 }
 
 // Hook into the convar from the engine
-ConVar skill( "skill", "1" );
+//ConVar skill( "skill", "1" );
 
 void CGameRules::Think()
 {
 	GetVoiceGameMgr()->Update( gpGlobals->frametime );
-	SetSkillLevel( skill.GetInt() );
+	SetSkillLevel( g_skill.GetInt() );
 
 	if ( log_verbose_enable.GetBool() )
 	{
@@ -814,7 +825,7 @@ float CGameRules::GetAmmoDamage( CBaseEntity *pAttacker, CBaseEntity *pVictim, i
 	float flDamage = 0;
 	CAmmoDef *pAmmoDef = GetAmmoDef();
 
-	if ( pAttacker->IsPlayer() )
+	if (pAttacker && pAttacker->IsPlayer())
 	{
 		flDamage = pAmmoDef->PlrDamage( nAmmoType );
 	}
@@ -883,7 +894,6 @@ void CGameRules::ClientSettingsChanged( CBasePlayer *pPlayer )
 	if ( pszFov )
 	{
 		int iFov = atoi(pszFov);
-		iFov = clamp( iFov, 75, 90 );
 		pPlayer->SetDefaultFOV( iFov );
 	}
 

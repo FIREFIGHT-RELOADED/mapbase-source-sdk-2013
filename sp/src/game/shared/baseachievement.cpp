@@ -38,6 +38,10 @@ DEFINE_FIELD( m_bActivated,					FIELD_BOOLEAN ),
 DEFINE_FIELD( m_bFailed,					FIELD_BOOLEAN ),
 END_DATADESC()
 
+BEGIN_DATADESC(CFailableAchievementNoEvent)
+DEFINE_FIELD(m_bFailed,						FIELD_BOOLEAN),
+END_DATADESC()
+
 //-----------------------------------------------------------------------------
 // Purpose: constructor
 //-----------------------------------------------------------------------------
@@ -383,6 +387,14 @@ void CBaseAchievement::AwardAchievement()
 	if ( IsAchieved() )
 		return;
 
+	/*
+	CAchievementNotificationPanel *pPanel = new CAchievementNotificationPanel("AchievementNotification");
+	if (pPanel)
+	{
+		pPanel->AddNotification(GetName(), ACHIEVEMENT_LOCALIZED_NAME_FROM_STR(GetName()), g_pVGuiLocalize->Find("#GameUI_Achievement_Unlocked"));
+	}
+	*/
+
 	m_pAchievementMgr->AwardAchievement( m_iAchievementID );
 }
 
@@ -466,6 +478,30 @@ void CBaseAchievement::ShowProgressNotification()
 	if ( !ShouldShowProgressNotification() )
 		return;
 
+#ifdef CLIENT_DLL
+	CAchievementNotificationPanel *pPanel = new CAchievementNotificationPanel("AchievementNotification");
+	if (pPanel)
+	{
+		int iCur = GetCount();
+		int iMax = GetGoal();
+		wchar_t szFmt[128] = L"";
+		wchar_t szText[512] = L"";
+		wchar_t szNumFound[16] = L"";
+		wchar_t szNumTotal[16] = L"";
+		_snwprintf(szNumFound, ARRAYSIZE(szNumFound), L"%i", iCur);
+		_snwprintf(szNumTotal, ARRAYSIZE(szNumTotal), L"%i", iMax);
+
+		const wchar_t *pchFmt = g_pVGuiLocalize->Find("#GameUI_Achievement_Progress_Fmt");
+		if (!pchFmt || !pchFmt[0])
+			return;
+		Q_wcsncpy(szFmt, pchFmt, sizeof(szFmt));
+
+		g_pVGuiLocalize->ConstructString(szText, sizeof(szText), szFmt, 3, ACHIEVEMENT_LOCALIZED_NAME_FROM_STR(GetName()), szNumFound, szNumTotal);
+		pPanel->AddNotification(GetName(), ACHIEVEMENT_LOCALIZED_NAME_FROM_STR(GetName()), szText);
+	}
+#endif	
+
+	/*
 	IGameEvent *event = gameeventmanager->CreateEvent( "achievement_event" );
 	if ( event )
 	{
@@ -478,6 +514,7 @@ void CBaseAchievement::ShowProgressNotification()
 		gameeventmanager->FireEventClientSide( event );
 #endif
 	}	
+	*/
 }
 
 //-----------------------------------------------------------------------------
@@ -725,6 +762,69 @@ void CFailableAchievement::SetFailed()
 			Msg( "Achievement failed: %s (%s)\n", GetName(), GetName() );
 		}	
 	}	
+}
+
+//===========================================
+
+//-----------------------------------------------------------------------------
+// Purpose: Constructor
+//-----------------------------------------------------------------------------
+CFailableAchievementNoEvent::CFailableAchievementNoEvent() : CBaseAchievement()
+{
+	m_bFailed = false;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: returns whether we should save this achievement with a save game
+//-----------------------------------------------------------------------------
+bool CFailableAchievementNoEvent::ShouldSaveWithGame()
+{
+	// save if we should get saved with the game, and are active or have failed
+	return (((m_iFlags & ACH_SAVE_WITH_GAME) > 0) && (m_bFailed));
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: clears dynamic state for this achievement
+//-----------------------------------------------------------------------------
+void CFailableAchievementNoEvent::PreRestoreSavedGame()
+{
+	m_bFailed = false;
+
+	BaseClass::PreRestoreSavedGame();
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Called when this failable achievement should be evaluated
+//-----------------------------------------------------------------------------
+void CFailableAchievementNoEvent::CheckIncrementCount()
+{
+	if (!m_bFailed)
+	{
+		// we haven't failed and we reached the evaluation point, we've succeeded
+		IncrementCount();
+	}
+
+	if (cc_achievement_debug.GetInt())
+	{
+		Msg("Failable achievement %s has been evaluated (%s), now inactive\n", GetName(), m_bFailed ? "FAILED" : "AWARDED");
+	}
+}
+
+
+//-----------------------------------------------------------------------------
+// Purpose: Sets this achievement to failed
+//-----------------------------------------------------------------------------
+void CFailableAchievementNoEvent::SetFailed()
+{
+	if (!m_bFailed)
+	{
+		m_bFailed = true;
+
+		if (cc_achievement_debug.GetInt())
+		{
+			Msg("Achievement failed: %s (%s)\n", GetName(), GetName());
+		}
+	}
 }
 
 //===========================================

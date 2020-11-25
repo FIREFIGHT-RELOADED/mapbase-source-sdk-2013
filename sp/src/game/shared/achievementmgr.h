@@ -20,6 +20,8 @@
 
 #define THINK_CLEAR		-1
 
+//#define MOD_VER 1
+
 class CAchievementMgr : public CAutoGameSystemPerFrame, public CGameEventListener, public IAchievementMgr
 {
 public:
@@ -34,7 +36,11 @@ public:
         SteamCloudPersist_On,
     };
 
+#ifdef MOD_VER
 	CAchievementMgr( SteamCloudPersisting ePersistToSteamCloud = SteamCloudPersist_Off );
+#else
+	CAchievementMgr(SteamCloudPersisting ePersistToSteamCloud = SteamCloudPersist_On);
+#endif
 
     //=============================================================================
     // HPE_END
@@ -69,6 +75,9 @@ public:
 	void LoadGlobalState();
 	void SaveGlobalStateIfDirty( bool bAsync = false );
 	void EnsureGlobalStateLoaded();
+#ifdef GAME_DLL
+	void ShowAchievementMessage(CBaseEntity *pEntity, const char *pMessage);
+#endif
 	void AwardAchievement( int iAchievementID );
 	void UpdateAchievement( int iAchievementID, int nData );
 	void PreRestoreSavedGame();

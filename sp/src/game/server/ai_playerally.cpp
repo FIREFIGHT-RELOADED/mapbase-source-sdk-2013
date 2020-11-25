@@ -539,6 +539,10 @@ void CAI_PlayerAlly::PrescheduleThink( void )
 
 		if ( g_pGameRules->IsSkillLevel(SKILL_HARD) )
 			flHealthRegen *= 0.5f;
+		else if (g_pGameRules->IsSkillLevel(SKILL_VERYHARD))
+			flHealthRegen *= 0.3f;
+		else if (g_pGameRules->IsSkillLevel(SKILL_NIGHTMARE))
+			flHealthRegen *= 0.2f;
 		else if ( g_pGameRules->IsSkillLevel(SKILL_EASY) )
 			flHealthRegen *= 1.5f;
 

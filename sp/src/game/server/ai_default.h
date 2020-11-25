@@ -111,6 +111,9 @@ enum
 
 	SCHED_SLEEP,
 
+	//custom enums here -bitl
+	SCHED_PATROL_WALK_LOOP,
+
 	// ======================================
 	// IMPORTANT: This must be the last enum
 	// ======================================

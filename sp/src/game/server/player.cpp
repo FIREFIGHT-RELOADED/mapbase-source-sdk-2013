@@ -69,6 +69,7 @@
 #include "dt_utlvector_send.h"
 #include "vote_controller.h"
 #include "ai_speech.h"
+#include "viewport_panel_names.h"
 
 #if defined USES_ECON_ITEMS
 #include "econ_wearable.h"
@@ -76,6 +77,7 @@
 
 // NVNT haptic utils
 #include "haptics/haptic_utils.h"
+#include "hl2_gamerules.h"
 
 #ifdef HL2_DLL
 #include "combine_mine.h"
@@ -108,7 +110,8 @@ static ConVar sv_maxusrcmdprocessticks( "sv_maxusrcmdprocessticks", "24", FCVAR_
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
-static ConVar old_armor( "player_old_armor", "0" );
+//static ConVar old_armor( "player_old_armor", "0" );
+static ConVar armor_mode("player_armor_mode", "2", FCVAR_ARCHIVE);
 
 static ConVar physicsshadowupdate_render( "physicsshadowupdate_render", "0" );
 bool IsInCommentaryMode( void );
@@ -127,6 +130,7 @@ ConVar	sv_noclipduringpause( "sv_noclipduringpause", "0", FCVAR_REPLICATED | FCV
 extern ConVar sv_maxunlag;
 extern ConVar sv_turbophysics;
 extern ConVar *sv_maxreplay;
+extern ConVar physcannon_mega_enabled;
 
 extern CServerGameDLL g_ServerGameDLL;
 
@@ -164,6 +168,8 @@ extern CServerGameDLL g_ServerGameDLL;
 
 extern bool		g_fDrawLines;
 int				gEvilImpulse101;
+float			m_fRegenRemander;
+float			m_fDecayRemander;
 
 bool gInitHUD = true;
 
@@ -203,10 +209,48 @@ ConVar  player_debug_print_damage( "player_debug_print_damage", "0", FCVAR_CHEAT
 ConVar	player_use_visibility_cache( "player_use_visibility_cache", "0", FCVAR_NONE, "Allows the player to use the visibility cache." );
 #endif
 
+ConVar sv_regeneration("sv_regeneration", "1", FCVAR_REPLICATED | FCVAR_ARCHIVE);
+ConVar sv_regeneration_wait_time("sv_regeneration_wait_time", "1.0", FCVAR_REPLICATED | FCVAR_CHEAT);
+ConVar sv_regeneration_rate_default("sv_regeneration_rate_default", "5.5", FCVAR_REPLICATED | FCVAR_CHEAT);
+ConVar sv_regeneration_rate("sv_regeneration_rate", "5.5", FCVAR_REPLICATED | FCVAR_CHEAT);
+ConVar sv_regen_interval("sv_regen_interval", "10", FCVAR_REPLICATED | FCVAR_CHEAT, "Set what interval of health to regen to.\n    i.e. if this is set to the default value (10), if you are damaged to 75 health, you'll regenerate to 80 health.\n    Set this to 0 to disable this mechanic.");
+
+ConVar sv_decay_wait_time("sv_decay_wait_time", "0.5", FCVAR_REPLICATED | FCVAR_CHEAT);
+ConVar sv_decay_rate("sv_decay_rate", "8.5", FCVAR_REPLICATED | FCVAR_CHEAT);
+
+ConVar sv_fr_maxhealthupgrades("sv_fr_maxhealthupgrades", "15", FCVAR_CHEAT);
+
+ConVar sk_player_weapons("sk_player_weapons", "1");
+
+ConVar sv_player_maxsuitpower("sv_player_maxsuitpower", "200", FCVAR_REPLICATED);
+
+ConVar sv_player_voice("sv_player_voice", "0", FCVAR_ARCHIVE);
+ConVar sv_player_voice_kill_freq("sv_player_voice_kill_freq", "8", FCVAR_CHEAT);
+ConVar sv_player_voice_kill("sv_player_voice_kill", "1", FCVAR_ARCHIVE);
+ConVar sv_player_voice_death("sv_player_voice_death", "1", FCVAR_ARCHIVE);
+ConVar sv_player_voice_hit_freq("sv_player_voice_hit_freq", "4", FCVAR_CHEAT);
+ConVar sv_player_voice_hit("sv_player_voice_hit", "1", FCVAR_ARCHIVE);
+ConVar sv_player_voice_perk("sv_player_voice_perk", "1", FCVAR_ARCHIVE);
+ConVar sv_player_startingmoney("sv_player_startingmoney", "0", FCVAR_ARCHIVE);
+ConVar sv_player_startingmoney_amount("sv_player_startingmoney_amount", "300", FCVAR_ARCHIVE);
+ConVar sv_player_hardcoremode("sv_player_hardcoremode", "0", FCVAR_ARCHIVE);
+ConVar sv_store_buynotifications("sv_store_buynotifications", "1", FCVAR_ARCHIVE);
+ConVar sv_store_denynotifications("sv_store_denynotifications", "1", FCVAR_ARCHIVE);
+ConVar sv_store_buysounds("sv_store_buysounds", "1", FCVAR_ARCHIVE);
+ConVar sv_store_denysounds("sv_store_denysounds", "1", FCVAR_ARCHIVE);
+ConVar sv_player_dmgsounds("sv_player_dmgsounds", "1", FCVAR_ARCHIVE);
+
+ConVar sv_fr_perks("sv_fr_perks", "1", FCVAR_ARCHIVE);
+ConVar sv_fr_perks_infiniteauxpower("sv_fr_perks_infiniteauxpower", "1", FCVAR_ARCHIVE);
+ConVar sv_fr_perks_infiniteammo("sv_fr_perks_infiniteammo", "1", FCVAR_ARCHIVE);
+ConVar sv_fr_perks_healthregenerationrate("sv_fr_perks_healthregenerationrate", "1", FCVAR_ARCHIVE);
+
+ConVar sv_fr_perks_oldperkbehavior("sv_fr_perks_oldperkbehavior", "0", FCVAR_ARCHIVE);
+
 
 void CC_GiveCurrentAmmo( void )
 {
-	CBasePlayer *pPlayer = UTIL_PlayerByIndex(1);
+	CBasePlayer *pPlayer = UTIL_GetCommandClient();
 
 	if( pPlayer )
 	{
@@ -244,6 +288,138 @@ void CC_GiveCurrentAmmo( void )
 	}
 }
 static ConCommand givecurrentammo("givecurrentammo", CC_GiveCurrentAmmo, "Give a supply of ammo for current weapon..\n", FCVAR_CHEAT );
+
+/*
+void CC_BuyItem(const CCommand &args)
+{
+	CBasePlayer *pPlayer = UTIL_PlayerByIndex(1);
+
+	int moneyAmount = atoi(args[2]);
+	int canGetMultiple = atoi(args[3]);
+
+	if (pPlayer)
+	{
+		if (pPlayer->GetMoney() < moneyAmount)
+		{
+			engine->ClientCommand(pPlayer->edict(), "messagebox #GameUI_Store_Title #GameUI_Store_InsufficientFunds");
+		}
+		else if (pPlayer->HasNamedPlayerItem(args[1]) && canGetMultiple == 0)
+		{
+			engine->ClientCommand(pPlayer->edict(), "messagebox #GameUI_Store_Title #GameUI_Store_AlreadyHasItem");
+		}
+		else
+		{
+			pPlayer->GiveNamedItem(args[1]);
+			pPlayer->RemoveMoney(moneyAmount);
+			engine->ClientCommand(pPlayer->edict(), "messagebox #GameUI_Store_Title #GameUI_Store_TransactionCompleted");
+		}
+	}
+}
+static ConCommand buyitem("buyitem", CC_BuyItem, "Buy a entity.\n");
+*/
+
+void CC_GiveRandomPerk(void)
+{
+	CBasePlayer *pPlayer = UTIL_PlayerByIndex(1);
+
+	if (pPlayer)
+	{
+		if (sv_fr_perks.GetBool())
+		{
+			pPlayer->Reward_GivePerk();
+		}
+	}
+}
+static ConCommand giverandomperk("giverandomperk", CC_GiveRandomPerk, "Get a random perk\n", FCVAR_CHEAT);
+
+/*
+void CC_BuyUpgrade(const CCommand &args)
+{
+	CBasePlayer *pPlayer = UTIL_PlayerByIndex(1);
+
+	int upgradeID = atoi(args[1]);
+	int moneyAmount = atoi(args[2]);
+
+	if (pPlayer)
+	{
+		if (pPlayer->GetMoney() < moneyAmount)
+		{
+			engine->ClientCommand(pPlayer->edict(), "messagebox #GameUI_Store_Title #GameUI_Store_InsufficientFunds");
+		}
+		else
+		{
+			if (upgradeID == FIREFIGHT_UPGRADE_MAXHEALTH)
+			{
+				pPlayer->Market_SetMaxHealth();
+			}
+			else if (upgradeID == FIREFIGHT_UPGRADE_MAXARMOR)
+			{
+				pPlayer->Market_SetMaxArmor();
+			}
+			pPlayer->RemoveMoney(moneyAmount);
+			engine->ClientCommand(pPlayer->edict(), "messagebox #GameUI_Store_Title #GameUI_Store_TransactionCompleted");
+		}
+	}
+}
+static ConCommand buyupgrade("buyupgrade", CC_BuyUpgrade, "Buy a upgrade.\n");
+*/
+
+void CC_PlayerXP(const CCommand &args)
+{
+	CBasePlayer *pPlayer = UTIL_PlayerByIndex(1);
+
+	int XPAmount = atoi(args[1]);
+
+	if (pPlayer)
+	{
+		pPlayer->AddXP(XPAmount);
+	}
+}
+static ConCommand player_givexp("givexp", CC_PlayerXP, "Gives the player XP points.\n", FCVAR_CHEAT);
+
+void CC_PlayerLevel(const CCommand &args)
+{
+	CBasePlayer *pPlayer = UTIL_PlayerByIndex(1);
+
+	int LevelNum = atoi(args[1]);
+
+	if (pPlayer)
+	{
+		if (LevelNum < 1)
+		{
+			Warning("This value is below the minimum level!\n");
+			return;
+		}
+		
+		if (LevelNum <= MAX_LEVEL)
+		{
+			pPlayer->SetLevel(LevelNum);
+			pPlayer->CheckLevel();
+		}
+		else
+		{
+			Warning("This value is above the maximum level!\n");
+		}
+	}
+	else
+	{
+		Warning("no.\n");
+	}
+}
+static ConCommand player_setlevel("givelevel", CC_PlayerLevel, "Increases the player's level.\n", FCVAR_CHEAT);
+
+void CC_PlayerMoney(const CCommand &args)
+{
+	CBasePlayer *pPlayer = UTIL_PlayerByIndex(1);
+
+	int MoneyAmount = atoi(args[1]);
+
+	if (pPlayer)
+	{
+		pPlayer->AddMoney(MoneyAmount);
+	}
+}
+static ConCommand player_givemoney("givemoney", CC_PlayerMoney, "Gives the player money. DOSH!\n", FCVAR_CHEAT);
 
 
 // pl
@@ -339,6 +515,8 @@ BEGIN_DATADESC( CBasePlayer )
 	DEFINE_FIELD( m_iBonusChallenge, FIELD_INTEGER ),
 	DEFINE_FIELD( m_lastDamageAmount, FIELD_INTEGER ),
 	DEFINE_FIELD( m_tbdPrev, FIELD_TIME ),
+	DEFINE_FIELD(m_fTimeLastHurt, FIELD_TIME),
+	DEFINE_FIELD(m_fTimeLastHealed, FIELD_TIME),
 	DEFINE_FIELD( m_flStepSoundTime, FIELD_FLOAT ),
 	DEFINE_ARRAY( m_szNetname, FIELD_CHARACTER, MAX_PLAYER_NAME_LENGTH ),
 
@@ -381,6 +559,10 @@ BEGIN_DATADESC( CBasePlayer )
 	//DEFINE_FIELD( m_iConnected, FIELD_INTEGER ),
 	// from edict_t
 	DEFINE_FIELD( m_ArmorValue, FIELD_INTEGER ),
+	DEFINE_FIELD( m_MaxArmorValue, FIELD_INTEGER),
+	DEFINE_FIELD(m_MaxHealthVal, FIELD_INTEGER),
+	DEFINE_FIELD(m_MaxHealthValExtra, FIELD_INTEGER),
+	DEFINE_FIELD(m_iHealthUpgrades, FIELD_INTEGER),
 	DEFINE_FIELD( m_DmgOrigin, FIELD_VECTOR ),
 	DEFINE_FIELD( m_DmgTake, FIELD_FLOAT ),
 	DEFINE_FIELD( m_DmgSave, FIELD_FLOAT ),
@@ -473,6 +655,16 @@ BEGIN_DATADESC( CBasePlayer )
 
 	DEFINE_FIELD( m_nNumCrateHudHints, FIELD_INTEGER ),
 
+	DEFINE_FIELD(m_iExp, FIELD_INTEGER),
+	DEFINE_FIELD(m_iLevel, FIELD_INTEGER),
+	DEFINE_FIELD(m_iMaxExp, FIELD_INTEGER),
+	DEFINE_FIELD(m_iPerkInfiniteAuxPower, FIELD_INTEGER),
+	DEFINE_FIELD(m_iPerkInfiniteAmmo, FIELD_INTEGER),
+	DEFINE_FIELD(m_bAlreadyHasInfiniteAuxPowerPerk, FIELD_BOOLEAN),
+	DEFINE_FIELD(m_bAlreadyHasInfiniteAmmoPerk, FIELD_BOOLEAN),
+	DEFINE_FIELD(m_iMoney, FIELD_INTEGER),
+
+	DEFINE_FIELD(m_fRegenRate, FIELD_FLOAT),
 
 
 	// DEFINE_FIELD( m_nBodyPitchPoseParam, FIELD_INTEGER ),
@@ -672,6 +864,8 @@ CBasePlayer::CBasePlayer( )
 	m_szNetname[0] = '\0';
 
 	m_iHealth = 0;
+	m_fRegenRemander = 0;
+	m_fDecayRemander = 0;
 	Weapon_SetLast( NULL );
 	m_bitsDamageType = 0;
 
@@ -728,6 +922,24 @@ CBasePlayer::CBasePlayer( )
 
 	m_flLastUserCommandTime = 0.f;
 	m_flMovementTimeForUserCmdProcessingRemaining = 0.0f;
+
+	m_Perk = -1;
+
+	m_iExp = 0;
+	m_iMaxExp = 0;
+	m_iLevel = 1;
+	//LevelUp();
+
+	m_iPerkInfiniteAuxPower = 0;
+	m_iPerkInfiniteAmmo = 0;
+	m_bAlreadyHasInfiniteAuxPowerPerk = false;
+	m_bAlreadyHasInfiniteAmmoPerk = false;
+
+	m_iMoney = 0;
+
+	m_iHealthUpgrades = 0;
+
+	m_fRegenRate = sv_regeneration_rate_default.GetFloat();
 }
 
 CBasePlayer::~CBasePlayer( )
@@ -823,26 +1035,33 @@ int CBasePlayer::ShouldTransmit( const CCheckTransmitInfo *pInfo )
 }
 
 
-bool CBasePlayer::WantsLagCompensationOnEntity( const CBasePlayer *pPlayer, const CUserCmd *pCmd, const CBitVec<MAX_EDICTS> *pEntityTransmitBits ) const
+bool CBasePlayer::WantsLagCompensationOnEntity(const CBaseEntity *pEntity, const CUserCmd *pCmd, const CBitVec<MAX_EDICTS> *pEntityTransmitBits) const
 {
 	//Tony; only check teams in teamplay
 	if ( gpGlobals->teamplay )
 	{
 		// Team members shouldn't be adjusted unless friendly fire is on.
-		if ( !friendlyfire.GetInt() && pPlayer->GetTeamNumber() == GetTeamNumber() )
+		if (!friendlyfire.GetInt() && pEntity->GetTeamNumber() == GetTeamNumber())
 			return false;
 	}
 
 	// If this entity hasn't been transmitted to us and acked, then don't bother lag compensating it.
-	if ( pEntityTransmitBits && !pEntityTransmitBits->Get( pPlayer->entindex() ) )
+	if (pEntityTransmitBits && !pEntityTransmitBits->Get(pEntity->entindex()))
 		return false;
 
 	const Vector &vMyOrigin = GetAbsOrigin();
-	const Vector &vHisOrigin = pPlayer->GetAbsOrigin();
+	const Vector &vHisOrigin = pEntity->GetAbsOrigin();
 
 	// get max distance player could have moved within max lag compensation time, 
 	// multiply by 1.5 to to avoid "dead zones"  (sqrt(2) would be the exact value)
-	float maxDistance = 1.5 * pPlayer->MaxSpeed() * sv_maxunlag.GetFloat();
+	//float maxDistance = 1.5 * pPlayer->MaxSpeed() * sv_maxunlag.GetFloat(); 
+	float maxspeed;
+	CBasePlayer *pPlayer = ToBasePlayer((CBaseEntity*)pEntity);
+	if (pPlayer)
+		maxspeed = pPlayer->MaxSpeed();
+	else
+		maxspeed = 600;
+	float maxDistance = 1.5 * maxspeed * sv_maxunlag.GetFloat();
 
 	// If the player is within this distance, lag compensate them in case they're running past us.
 	if ( vHisOrigin.DistTo( vMyOrigin ) < maxDistance )
@@ -878,6 +1097,616 @@ void CBasePlayer::SetBonusChallenge( int iBonusChallenge )
 	m_iBonusChallenge = iBonusChallenge;
 }
 
+int CBasePlayer::GetXpToLevelUp(int level)
+{
+	return MAX_EXP * (level);
+}
+
+void CBasePlayer::CheckLevel()
+{
+	if (!g_fr_classic.GetBool())
+	{
+		bool bShouldLevel = false;
+		SetMaxXP(GetXpToLevelUp(GetLevel()));
+		if (GetLevel() < MAX_LEVEL && GetXP() >= GetMaxXP())
+		{
+			bShouldLevel = true;
+			m_iLevel++;
+			LevelUp();
+			ResetXPAlt();
+			if (!physcannon_mega_enabled.GetBool() && HL2GameRules()->MegaPhyscannonActive())
+			{
+				HL2GameRules()->SetMegaPhyscannonInActive();
+			}
+		}
+
+		if (GetLevel() == MAX_LEVEL)
+		{
+			IGameEvent * event = gameeventmanager->CreateEvent("player_maxlevel");
+			if (event)
+			{
+				event->SetInt("userid", GetUserID());
+				gameeventmanager->FireEvent(event);
+			}
+
+			RemoveAllItems(false);
+			HL2GameRules()->SetMegaPhyscannonActive();
+			GiveNamedItem("weapon_grapple");
+			GiveNamedItem("weapon_physcannon");
+
+			CFmtStr hint;
+			hint.sprintf("#GameUI_MaximumLevel");
+			ShowPerkMessage(hint.Access());
+		}
+	}
+}
+
+void CBasePlayer::DeathCheckLevel()
+{
+	if (!g_fr_classic.GetBool())
+	{
+		if (GetLevel() != MAX_LEVEL)
+		{
+			EXPLevelPenalty();
+		}
+	}
+}
+
+void CBasePlayer::EXPLevelPenalty()
+{
+	int inewEXP = (m_iExp / 2);
+
+	DevMsg("EXP %i set to %i\n", m_iExp, inewEXP);
+
+	if (inewEXP > 0)
+	{
+		m_iExp = inewEXP;
+	}
+	else
+	{
+		if ((GetLevel() != 1) || (GetLevel() != MAX_LEVEL))
+		{
+			m_iLevel--;
+		}
+
+		m_iExp = 0;
+	}
+
+	DevMsg("EXP set to %i\n", m_iExp);
+}
+
+void CBasePlayer::LevelUp()
+{
+	if (!g_fr_classic.GetBool())
+	{
+		if (g_fr_economy.GetBool())
+		{
+			AddMoney(GetLevel());
+		}
+
+		DetermineReward();
+	}
+}
+
+void CBasePlayer::DetermineReward(void)
+{
+	if (sv_fr_perks_oldperkbehavior.GetBool())
+	{
+		Reward_GivePerk();
+	}
+	else
+	{
+		int rewardtogive = random->RandomInt(0, 2);
+
+		switch (rewardtogive)
+		{
+			case FIREFIGHT_REWARD_PERKS:
+				Reward_GivePerk();
+				break;
+			case FIREFIGHT_REWARD_ITEM:
+				Reward_GiveItem();
+				break;
+			case FIREFIGHT_REWARD_KASHBONUS:
+				if (GetLevel() >= 10 && g_fr_economy.GetBool())
+				{
+					Reward_GiveKashBonus();
+					break;
+				}
+			default:
+				int altrewardtogive = random->RandomInt(0, 1);
+				switch (altrewardtogive)
+				{
+					case FIREFIGHT_REWARD_PERKS:
+						Reward_GivePerk();
+						break;
+					case FIREFIGHT_REWARD_ITEM:
+						Reward_GiveItem();
+						break;
+				}
+				break;
+		}
+	}
+}
+
+void CBasePlayer::Reward_GivePerk(void)
+{
+	if (sv_fr_perks.GetBool())
+	{
+		int randomperk = random->RandomInt(0, 2);
+		//int CurrentLevel = GetLevel();
+
+		switch (randomperk)
+		{
+			case FIREFIGHT_PERK_INFINITEAMMO:
+				if (!m_bAlreadyHasInfiniteAmmoPerk && GetLevel() >= 15 && sv_fr_perks_infiniteammo.GetBool())
+				{
+					m_iPerkInfiniteAmmo = 1;
+					m_bAlreadyHasInfiniteAmmoPerk = true;
+					if (!g_fr_classic.GetBool())
+					{
+						CFmtStr hint;
+						hint.sprintf("#Valve_Hud_INFINITEAMMO");
+						ShowPerkMessage(hint.Access());
+					}
+					break;
+				}
+			case FIREFIGHT_PERK_INFINITEAUXPOWER:
+				if (!m_bAlreadyHasInfiniteAuxPowerPerk && GetLevel() >= 10 && sv_fr_perks_infiniteauxpower.GetBool())
+				{
+					m_iPerkInfiniteAuxPower = 1;
+					m_bAlreadyHasInfiniteAuxPowerPerk = true;
+					if (!g_fr_classic.GetBool())
+					{
+						CFmtStr hint;
+						hint.sprintf("#Valve_Hud_INFINITEAUXPOWER");
+						ShowPerkMessage(hint.Access());
+					}
+					break;
+				}
+			case FIREFIGHT_PERK_HEALTHREGENERATIONRATE:
+			default:
+				if (sv_fr_perks_healthregenerationrate.GetBool())
+				{
+					m_fRegenRate = m_fRegenRate + 0.5f;
+					if (!g_fr_classic.GetBool())
+					{
+						CFmtStr hint;
+						hint.sprintf("#Valve_Hud_HEALTHREGENERATIONRATE");
+						ShowPerkMessage(hint.Access());
+					}
+					break;
+				}
+				break;
+		}
+
+		if (sv_player_voice.GetBool() && sv_player_voice_perk.GetBool())
+		{
+			EmitSound("Player.VoicePerk");
+		}
+
+		m_Perk = randomperk;
+	}
+}
+
+extern ConVar sk_healthkit;
+extern ConVar sk_battery;
+
+void CBasePlayer::Reward_GiveItem(void)
+{
+	int randomitemdrop = random->RandomInt(0, 33);
+
+	CSingleUserRecipientFilter user(this);
+	CPASAttenuationFilter hfilter(this, "HealthKit.Touch");
+	CPASAttenuationFilter bfilter(this, "ItemBattery.Touch");
+	CFmtStr hint;
+
+	switch (randomitemdrop) 
+	{
+		case FIREFIGHT_ITEMREWARD_HEALTHKIT:
+			TakeHealth(sk_healthkit.GetInt(), DMG_GENERIC);
+			hint.sprintf("#Valve_Hud_Reward_Healthkit");
+			ShowPerkMessage(hint.Access());
+
+			user.MakeReliable();
+			UserMessageBegin(user, "ItemPickup");
+			WRITE_STRING("item_healthkit");
+			MessageEnd();
+			EmitSound(hfilter, entindex(), "HealthKit.Touch");
+			break;
+		case FIREFIGHT_ITEMREWARD_SUITBATTERY:
+			IncrementArmorValue(sk_battery.GetInt(), GetMaxArmorValue());
+			hint.sprintf("#Valve_Hud_Reward_Battery");
+			ShowPerkMessage(hint.Access());
+
+			user.MakeReliable();
+			UserMessageBegin(user, "ItemPickup");
+			WRITE_STRING("item_battery");
+			MessageEnd();
+			EmitSound(bfilter, entindex(), "ItemBattery.Touch");
+			break;
+		case FIREFIGHT_ITEMREWARD_AMMO_FRAGGRENADE:
+			GiveNamedItem("item_ammo_grenade");
+			hint.sprintf("#Valve_Hud_Reward_FragGrenade");
+			ShowPerkMessage(hint.Access());
+			break;
+		case FIREFIGHT_ITEMREWARD_AMMO_SLAM:
+			GiveNamedItem("item_slam_ammo");
+			hint.sprintf("#Valve_Hud_Reward_SLAMAmmo");
+			ShowPerkMessage(hint.Access());
+			break;
+		case FIREFIGHT_ITEMREWARD_BIGHEALTHKIT:
+			TakeHealth(50, DMG_GENERIC);
+			hint.sprintf("#Valve_Hud_Reward_BigHealthkit");
+			ShowPerkMessage(hint.Access());
+			
+			user.MakeReliable();
+			UserMessageBegin(user, "ItemPickup");
+			WRITE_STRING("item_healthkit");
+			MessageEnd();
+			EmitSound(hfilter, entindex(), "HealthKit.Touch");
+			break;
+		case FIREFIGHT_ITEMREWARD_BIGSUITBATTERY:
+			IncrementArmorValue(50, GetMaxArmorValue());
+			hint.sprintf("#Valve_Hud_Reward_BigBattery");
+			ShowPerkMessage(hint.Access());
+			
+			user.MakeReliable();
+			UserMessageBegin(user, "ItemPickup");
+			WRITE_STRING("item_battery");
+			MessageEnd();
+			EmitSound(bfilter, entindex(), "ItemBattery.Touch");
+			break;
+		case FIREFIGHT_ITEMREWARD_AMMO_357:
+			if (Weapon_OwnsThisType("weapon_357"))
+			{
+				GiveNamedItem("item_ammo_357");
+				GiveNamedItem("item_ammo_357");
+				hint.sprintf("#Valve_Hud_Reward_357Ammo");
+				ShowPerkMessage(hint.Access());
+				break;
+			}
+		case FIREFIGHT_ITEMREWARD_AMMO_AR2:
+			if (Weapon_OwnsThisType("weapon_ar2"))
+			{
+				GiveNamedItem("item_ammo_ar2");
+				GiveNamedItem("item_ammo_ar2");
+				hint.sprintf("#Valve_Hud_Reward_AR2Ammo");
+				ShowPerkMessage(hint.Access());
+				break;
+			}
+		case FIREFIGHT_ITEMREWARD_AMMO_CROSSBOW:
+			if (Weapon_OwnsThisType("weapon_crossbow"))
+			{
+				GiveNamedItem("item_ammo_crossbow");
+				GiveNamedItem("item_ammo_crossbow");
+				hint.sprintf("#Valve_Hud_Reward_CrossbowAmmo");
+				ShowPerkMessage(hint.Access());
+				break;
+			}
+		case FIREFIGHT_ITEMREWARD_AMMO_PISTOL:
+			if (Weapon_OwnsThisType("weapon_pistol"))
+			{
+				GiveNamedItem("item_ammo_pistol");
+				GiveNamedItem("item_ammo_pistol");
+				hint.sprintf("#Valve_Hud_Reward_PistolAmmo");
+				ShowPerkMessage(hint.Access());
+				break;
+			}
+		case FIREFIGHT_ITEMREWARD_AMMO_SMG1:
+			if (Weapon_OwnsThisType("weapon_smg1"))
+			{
+				GiveNamedItem("item_ammo_smg1");
+				GiveNamedItem("item_ammo_smg1");
+				hint.sprintf("#Valve_Hud_Reward_SMG1Ammo");
+				ShowPerkMessage(hint.Access());
+				break;
+			}
+		case FIREFIGHT_ITEMREWARD_AMMO_SHOTGUN:
+			if (Weapon_OwnsThisType("weapon_shotgun"))
+			{
+				GiveNamedItem("item_box_buckshot");
+				GiveNamedItem("item_box_buckshot");
+				hint.sprintf("#Valve_Hud_Reward_ShotgunAmmo");
+				ShowPerkMessage(hint.Access());
+				break;
+			}
+		case FIREFIGHT_ITEMREWARD_AMMO_SMG1GRENADE:
+			if (Weapon_OwnsThisType("weapon_smg1"))
+			{
+				GiveNamedItem("item_ammo_smg1_grenade");
+				hint.sprintf("#Valve_Hud_Reward_SMG1Grenade");
+				ShowPerkMessage(hint.Access());
+				break;
+			}
+		case FIREFIGHT_ITEMREWARD_AMMO_AR2BALL:
+			if (Weapon_OwnsThisType("weapon_ar2"))
+			{
+				GiveNamedItem("item_ammo_ar2_altfire");
+				hint.sprintf("#Valve_Hud_Reward_AR2Ball");
+				ShowPerkMessage(hint.Access());
+				break;
+			}
+		case FIREFIGHT_ITEMREWARD_AMMO_RPGROCKET:
+			if (Weapon_OwnsThisType("weapon_rpg"))
+			{
+				GiveNamedItem("item_rpg_round");
+				hint.sprintf("#Valve_Hud_Reward_RPGRocket");
+				ShowPerkMessage(hint.Access());
+				break;
+			}
+		case FIREFIGHT_ITEMREWARD_AMMO_SNIPERRIFLE:
+			if (Weapon_OwnsThisType("weapon_sniper_rifle"))
+			{
+				GiveNamedItem("item_ammo_sniperrifle");
+				GiveNamedItem("item_ammo_sniperrifle");
+				hint.sprintf("#Valve_Hud_Reward_SniperRifleAmmo");
+				ShowPerkMessage(hint.Access());
+				break;
+			}
+		case FIREFIGHT_ITEMREWARD_AMMO_DEAGLE:
+			if (Weapon_OwnsThisType("weapon_deagle"))
+			{
+				GiveNamedItem("item_ammo_deagle");
+				GiveNamedItem("item_ammo_deagle");
+				hint.sprintf("#Valve_Hud_Reward_DeagleAmmo");
+				ShowPerkMessage(hint.Access());
+				break;
+			}
+		case FIREFIGHT_ITEMREWARD_AMMO_M249PARA:
+			if (Weapon_OwnsThisType("weapon_m249para"))
+			{
+				GiveNamedItem("item_ammo_m249para");
+				hint.sprintf("#Valve_Hud_Reward_M249ParaAmmo");
+				ShowPerkMessage(hint.Access());
+				break;
+			}
+		case FIREFIGHT_ITEMREWARD_AMMO_OCIW:
+			if (Weapon_OwnsThisType("weapon_oicw"))
+			{
+				GiveNamedItem("item_ammo_oicw");
+				GiveNamedItem("item_ammo_oicw");
+				hint.sprintf("#Valve_Hud_Reward_OICWAmmo");
+				ShowPerkMessage(hint.Access());
+				break;
+			}
+		case FIREFIGHT_ITEMREWARD_AMMO_OCIWGRENADE:
+			if (Weapon_OwnsThisType("weapon_oicw"))
+			{
+				GiveNamedItem("item_oicw_grenade");
+				hint.sprintf("#Valve_Hud_Reward_OICWGrenade");
+				ShowPerkMessage(hint.Access());
+				break;
+			}
+		case FIREFIGHT_ITEMREWARD_AMMO_FLAREGUN:
+			if (Weapon_OwnsThisType("weapon_flaregun"))
+			{
+				GiveNamedItem("item_box_flare_rounds");
+				GiveNamedItem("item_box_flare_rounds");
+				hint.sprintf("#Valve_Hud_Reward_FlareGunAmmo");
+				ShowPerkMessage(hint.Access());
+				break;
+			}
+		case FIREFIGHT_ITEMREWARD_WEAPON_357:
+			if (!Weapon_OwnsThisType("weapon_357"))
+			{
+				GiveNamedItem("weapon_357");
+				hint.sprintf("#Valve_Hud_Reward_Weapon_357");
+				ShowPerkMessage(hint.Access());
+				break;
+			}
+		case FIREFIGHT_ITEMREWARD_WEAPON_AR2:
+			if (!Weapon_OwnsThisType("weapon_ar2"))
+			{
+				GiveNamedItem("weapon_ar2");
+				hint.sprintf("#Valve_Hud_Reward_Weapon_AR2");
+				ShowPerkMessage(hint.Access());
+				break;
+			}
+		case FIREFIGHT_ITEMREWARD_WEAPON_CROSSBOW:
+			if (!Weapon_OwnsThisType("weapon_crossbow"))
+			{
+				GiveNamedItem("weapon_crossbow");
+				hint.sprintf("#Valve_Hud_Reward_Weapon_Crossbow");
+				ShowPerkMessage(hint.Access());
+				break;
+			}
+		case FIREFIGHT_ITEMREWARD_WEAPON_SHOTGUN:
+			if (!Weapon_OwnsThisType("weapon_shotgun"))
+			{
+				GiveNamedItem("weapon_shotgun");
+				hint.sprintf("#Valve_Hud_Reward_Weapon_Shotgun");
+				ShowPerkMessage(hint.Access());
+				break;
+			}
+		case FIREFIGHT_ITEMREWARD_WEAPON_RPG:
+			if (!Weapon_OwnsThisType("weapon_rpg"))
+			{
+				GiveNamedItem("weapon_rpg");
+				hint.sprintf("#Valve_Hud_Reward_Weapon_RPG");
+				ShowPerkMessage(hint.Access());
+				break;
+			}
+		case FIREFIGHT_ITEMREWARD_WEAPON_SNIPERRIFLE:
+			if (!Weapon_OwnsThisType("weapon_sniper_rifle"))
+			{
+				GiveNamedItem("weapon_sniper_rifle");
+				hint.sprintf("#Valve_Hud_Reward_Weapon_Sniper_Rifle");
+				ShowPerkMessage(hint.Access());
+				break;
+			}
+		case FIREFIGHT_ITEMREWARD_WEAPON_DEAGLE:
+			if (!Weapon_OwnsThisType("weapon_deagle"))
+			{
+				GiveNamedItem("weapon_deagle");
+				hint.sprintf("#Valve_Hud_Reward_Weapon_Deagle");
+				ShowPerkMessage(hint.Access());
+				break;
+			}
+		case FIREFIGHT_ITEMREWARD_WEAPON_M249PARA:
+			if (!Weapon_OwnsThisType("weapon_m249para"))
+			{
+				GiveNamedItem("weapon_m249para");
+				hint.sprintf("#Valve_Hud_Reward_Weapon_M249Para");
+				ShowPerkMessage(hint.Access());
+				break;
+			}
+		case FIREFIGHT_ITEMREWARD_WEAPON_OCIW:
+			if (!Weapon_OwnsThisType("weapon_oicw"))
+			{
+				GiveNamedItem("weapon_oicw");
+				hint.sprintf("#Valve_Hud_Reward_Weapon_OCIW");
+				ShowPerkMessage(hint.Access());
+				break;
+			}
+		case FIREFIGHT_ITEMREWARD_WEAPON_FLAREGUN:
+			if (!Weapon_OwnsThisType("weapon_flaregun"))
+			{
+				GiveNamedItem("weapon_flaregun");
+				hint.sprintf("#Valve_Hud_Reward_Weapon_FlareGun");
+				ShowPerkMessage(hint.Access());
+				break;
+			}
+		case FIREFIGHT_ITEMREWARD_WEAPON_GAUSS:
+			if (!Weapon_OwnsThisType("weapon_gauss"))
+			{
+				GiveNamedItem("weapon_gauss");
+				hint.sprintf("#Valve_Hud_Reward_Weapon_Gauss");
+				ShowPerkMessage(hint.Access());
+				break;
+			}
+		case FIREFIGHT_ITEMREWARD_AMMO_GAUSS:
+			if (Weapon_OwnsThisType("weapon_gauss"))
+			{
+				GiveNamedItem("item_ammo_gauss");
+				GiveNamedItem("item_ammo_gauss");
+				hint.sprintf("#Valve_Hud_Reward_GaussAmmo");
+				ShowPerkMessage(hint.Access());
+				break;
+			}
+		case FIREFIGHT_ITEMREWARD_AMMO_MP5:
+			if (Weapon_OwnsThisType("weapon_mp5"))
+			{
+				GiveNamedItem("item_ammo_mp5");
+				GiveNamedItem("item_ammo_mp5");
+				hint.sprintf("#Valve_Hud_RewardMP5Ammo");
+				ShowPerkMessage(hint.Access());
+				break;
+			}
+		default: 
+			int randalt = random->RandomInt(0, 2);
+
+			switch (randalt)
+			{
+				case 0:
+					TakeHealth(sk_healthkit.GetInt(), DMG_GENERIC);
+					hint.sprintf("#Valve_Hud_Reward_Healthkit");
+					ShowPerkMessage(hint.Access());
+
+					user.MakeReliable();
+					UserMessageBegin(user, "ItemPickup");
+					WRITE_STRING("item_healthkit");
+					MessageEnd();
+					EmitSound(hfilter, entindex(), "HealthKit.Touch");
+					break;
+				case 1:
+					IncrementArmorValue(sk_battery.GetInt(), GetMaxArmorValue());
+					hint.sprintf("#Valve_Hud_Reward_Battery");
+					ShowPerkMessage(hint.Access());
+
+					user.MakeReliable();
+					UserMessageBegin(user, "ItemPickup");
+					WRITE_STRING("item_battery");
+					MessageEnd();
+					EmitSound(bfilter, entindex(), "ItemBattery.Touch");
+					break;
+				case 2:
+					Reward_GivePerk();
+					break;
+				default:
+					break;
+			}
+			break;
+	}
+}
+
+void CBasePlayer::Reward_GiveKashBonus(void)
+{
+	AddMoney(GetLevel() * 10);
+	CFmtStr hint;
+	hint.sprintf("#Valve_Hud_Reward_KashBonus");
+	ShowPerkMessage(hint.Access());
+}
+
+void CBasePlayer::ShowLevelMessage(const char *pMessage)
+{
+	CSingleUserRecipientFilter user(this);
+	user.MakeReliable();
+	UserMessageBegin(user, "LevelHintText");
+	WRITE_BYTE(1);	// one string
+	WRITE_STRING(pMessage);
+	MessageEnd();
+}
+
+void CBasePlayer::ShowPerkMessage(const char *pMessage)
+{
+	CSingleUserRecipientFilter user(this);
+	user.MakeReliable();
+	UserMessageBegin(user, "PerkHintText");
+	WRITE_BYTE(1);	// one string
+	WRITE_STRING(pMessage);
+	MessageEnd();
+}
+
+void CBasePlayer::Market_SetMaxHealth()
+{
+	IncrementMaxHealthRegenValue(10);
+	m_iHealthUpgrades++;
+}
+
+void CBasePlayer::LevelUpClassic()
+{
+	if (g_fr_classic.GetBool())
+	{
+		Reward_GivePerk();
+
+		if (sv_player_voice.GetBool() && sv_player_voice_perk.GetBool())
+		{
+			EmitSound("Player.VoicePerk");
+		}
+
+		CFmtStr hint;
+
+		if (sv_fr_perks.GetBool())
+		{
+			switch (m_Perk)
+			{
+				case FIREFIGHT_PERK_INFINITEAUXPOWER:
+					if (sv_fr_perks_infiniteauxpower.GetBool())
+					{
+						hint.sprintf("#Valve_Hud_INFINITEAUXPOWER_classic");
+						ShowPerkMessage(hint.Access());
+						break;
+					}
+				case FIREFIGHT_PERK_INFINITEAMMO:
+					if (sv_fr_perks_infiniteammo.GetBool())
+					{
+						hint.sprintf("#Valve_Hud_INFINITEAMMO_classic");
+						ShowPerkMessage(hint.Access());
+						break;
+					}
+				case FIREFIGHT_PERK_HEALTHREGENERATIONRATE:
+					if (sv_fr_perks_healthregenerationrate.GetBool())
+					{
+						hint.sprintf("#Valve_Hud_HEALTHREGENERATIONRATE_classic");
+						ShowPerkMessage(hint.Access());
+						break;
+					}
+				default:
+					break;
+			}
+		}
+	}
+}
 
 //-----------------------------------------------------------------------------
 // Sets the view angles
@@ -954,19 +1783,19 @@ int CBasePlayer::TakeHealth( float flHealth, int bitsDamageType )
 		int bitsDmgTimeBased = g_pGameRules->Damage_GetTimeBased();
 		m_bitsDamageType &= ~( bitsDamageType & ~bitsDmgTimeBased );
 	}
+	else
+	{
+		return 0;
+	}
 
-	// I disabled reporting history into the dbghist because it was super spammy.
-	// But, if you need to reenable it, the code is below in the "else" clause.
-#if 1 // #ifdef DISABLE_DEBUG_HISTORY
-	return BaseClass::TakeHealth (flHealth, bitsDamageType);
-#else
-	const int healingTaken = BaseClass::TakeHealth(flHealth,bitsDamageType);
-	char buf[256];
-	Q_snprintf(buf, 256, "[%f] Player %s healed for %d with damagetype %X\n", gpGlobals->curtime, GetDebugName(), healingTaken, bitsDamageType);
-	ADD_DEBUG_HISTORY( HISTORY_PLAYER_DAMAGE, buf );
+	if (!edict() || m_takedamage < DAMAGE_YES)
+		return 0;
 
-	return healingTaken;
-#endif
+	const int oldHealth = m_iHealth;
+
+	m_iHealth += flHealth;
+
+	return m_iHealth - oldHealth;
 }
 
 //-----------------------------------------------------------------------------
@@ -1099,13 +1928,15 @@ void CBasePlayer::DamageEffect(float flDamage, int fDamageType)
 	else if (fDamageType & DMG_SLASH)
 	{
 		// If slash damage shoot some blood
+		color32 red = { 128, 0, 0, 128 };
+		UTIL_ScreenFade(this, red, 1.0f, 0.1f, FFADE_IN);
 		SpawnBlood(EyePosition(), g_vecAttackDir, BloodColor(), flDamage);
 	}
 	else if (fDamageType & DMG_PLASMA)
 	{
 		// Blue screen fade
-		color32 blue = {0,0,255,100};
-		UTIL_ScreenFade( this, blue, 0.2, 0.4, FFADE_MODULATE );
+		color32 blue = { 50, 255, 170, 32 };
+		UTIL_ScreenFade(this, blue, 0.2, 0.4, FFADE_IN);
 
 		// Very small screen shake
 		// Both -0.1 and 0.1 map to 0 when converted to integer, so all of these RandomInt
@@ -1124,7 +1955,12 @@ void CBasePlayer::DamageEffect(float flDamage, int fDamageType)
 	}
 	else if ( fDamageType & DMG_BULLET )
 	{
-		EmitSound( "Flesh.BulletImpact" );
+		color32 red = { 128, 0, 0, 128 };
+		UTIL_ScreenFade(this, red, 1.0f, 0.1f, FFADE_IN);
+		if (sv_player_dmgsounds.GetBool())
+		{
+			EmitSound("Player.BulletDamage");
+		}
 	}
 }
 
@@ -1140,8 +1976,15 @@ void CBasePlayer::DamageEffect(float flDamage, int fDamageType)
 #define OLD_ARMOR_BONUS  0.5	// Each Point of Armor is work 1/x points of health
 
 // New values
-#define ARMOR_RATIO	0.2
-#define ARMOR_BONUS	1.0
+#define HL2_ARMOR_RATIO	0.2
+#define HL2_ARMOR_BONUS	1.0
+
+//FR's values
+#define FR_ARMOR_RATIO	0.1
+#define FR_ARMOR_BONUS	0.5
+
+//values
+#define FR_GRAPPLE_RATIO 0.3
 
 //---------------------------------------------------------
 //---------------------------------------------------------
@@ -1217,22 +2060,34 @@ int CBasePlayer::OnTakeDamage( const CTakeDamageInfo &inputInfo )
 	if ( !info.GetDamage() )
 		return 0;
 
-	if( old_armor.GetBool() )
+	if (armor_mode.GetInt() == 0)
 	{
 		flBonus = OLD_ARMOR_BONUS;
 		flRatio = OLD_ARMOR_RATIO;
 	}
+	else if (armor_mode.GetInt() == 1)
+	{
+		flBonus = HL2_ARMOR_BONUS;
+		flRatio = HL2_ARMOR_RATIO;
+	}
+	else if (armor_mode.GetInt() == 2)
+	{
+		flBonus = FR_ARMOR_BONUS;
+		flRatio = FR_ARMOR_RATIO;
+	}
 	else
 	{
-		flBonus = ARMOR_BONUS;
-		flRatio = ARMOR_RATIO;
+		flBonus = FR_ARMOR_BONUS;
+		flRatio = FR_ARMOR_RATIO;
 	}
 
+	/*
 	if ( ( info.GetDamageType() & DMG_BLAST ) && g_pGameRules->IsMultiplayer() )
 	{
 		// blasts damage armor more.
 		flBonus *= 2;
 	}
+	*/
 
 	// Already dead
 	if ( !IsAlive() )
@@ -1281,7 +2136,7 @@ int CBasePlayer::OnTakeDamage( const CTakeDamageInfo &inputInfo )
 
 		flArmor = (info.GetDamage() - flNew) * flBonus;
 
-		if( !old_armor.GetBool() )
+		if (armor_mode.GetInt() != 0 || armor_mode.GetInt() != 2)
 		{
 			if( flArmor < 1.0 )
 			{
@@ -1307,6 +2162,26 @@ int CBasePlayer::OnTakeDamage( const CTakeDamageInfo &inputInfo )
 		info.SetDamage( flNew );
 	}
 
+	float flRatioGrapple = FR_GRAPPLE_RATIO;
+
+	CBaseCombatWeapon *pWeapon = GetActiveWeapon();
+	const char *pWeaponClass = "weapon_grapple";
+
+	//grappling hook dmg resistance
+
+	if (pWeapon && GetGroundEntity() != NULL && !(info.GetDamageType() & (DMG_FALL | DMG_DROWN | DMG_POISON | DMG_RADIATION)))
+	{
+		const char *strWeaponName = pWeapon->GetName();
+
+		if (!Q_stricmp(strWeaponName, pWeaponClass))
+		{
+			float flNew = info.GetDamage() * flRatioGrapple;
+
+			m_DmgSave = flNew;
+
+			info.SetDamage(flNew);
+		}
+	}
 
 #if defined( WIN32 ) && !defined( _X360 )
 	// NVNT if player's client has a haptic device send them a user message with the damage.
@@ -1516,6 +2391,34 @@ int CBasePlayer::OnTakeDamage( const CTakeDamageInfo &inputInfo )
 	if ( bitsDamage & DMG_BLAST )
 	{
 		OnDamagedByExplosion( info );
+	}
+
+	if (GetHealth() < m_MaxHealthVal)
+	{
+		m_fTimeLastHurt = gpGlobals->curtime;
+	}
+
+	if (GetHealth() > m_MaxHealthVal)
+	{
+		m_fTimeLastHealed = gpGlobals->curtime;
+	}
+
+	if (sv_player_voice.GetBool())
+	{
+		if (m_iHealth < 1 && sv_player_voice_death.GetBool())
+		{
+			EmitSound("Player.VoiceDeath");
+			StopSound("Player.VoiceKill");
+			StopSound("Player.VoicePerk");
+		}
+		else if (sv_player_voice_hit.GetBool())
+		{
+			int killvoicerandom = random->RandomInt(0, sv_player_voice_hit_freq.GetInt());
+			if (killvoicerandom == 0)
+			{
+				EmitSound("Player.VoiceHit");
+			}
+		}
 	}
 
 	return fTookDamage;
@@ -1835,6 +2738,8 @@ void CBasePlayer::Event_Killed( const CTakeDamageInfo &info )
 	// reset FOV
 	SetFOV( this, 0 );
 	
+	DeathCheckLevel();
+	
 	if ( FlashlightIsOn() )
 	{
 		 FlashlightTurnOff();
@@ -1843,6 +2748,18 @@ void CBasePlayer::Event_Killed( const CTakeDamageInfo &info )
 	m_flDeathTime = gpGlobals->curtime;
 
 	ClearLastKnownArea();
+
+	if ((GetLevel() == MAX_LEVEL || sv_player_hardcoremode.GetBool()) && !g_pGameRules->IsMultiplayer())
+	{
+		color32 black = { 0, 0, 0, 255 };
+		UTIL_ScreenFade(this, black, 0.6, 9999, FFADE_OUT | FFADE_PURGE | FFADE_STAYOUT);
+	}
+	else
+	{
+		// Clear any screenfade
+		color32 nothing = { 0, 0, 0, 255 };
+		UTIL_ScreenFade(this, nothing, 0, 0, FFADE_IN | FFADE_PURGE);
+	}
 
 	BaseClass::Event_Killed( info );
 }
@@ -4758,6 +5675,50 @@ void CBasePlayer::PostThink()
 	SimulatePlayerSimulatedEntities();
 #endif
 
+	// Regenerate heath
+	if (IsAlive() && GetHealth() < m_MaxHealthVal && (sv_regeneration.GetInt() == 1))
+	{
+		// Color to overlay on the screen while the player is taking damage
+
+		if (gpGlobals->curtime > m_fTimeLastHurt + sv_regeneration_wait_time.GetFloat())
+		{
+			//Regenerate based on rate, and scale it by the frametime
+			m_fRegenRemander += sv_regeneration_rate.GetFloat() * gpGlobals->frametime;
+
+			if (m_fRegenRemander >= 1)
+			{
+				//If the regen interval is set, and the health is evenly divisible by that interval, don't regen.
+				if (sv_regen_interval.GetFloat() > 0 && floor(m_iHealth / sv_regen_interval.GetFloat()) == m_iHealth / sv_regen_interval.GetFloat())
+				{
+					m_fRegenRemander = 0;
+				}
+				else 
+				{
+					TakeHealth(m_fRegenRemander, DMG_GENERIC);
+					m_fRegenRemander = 0;
+				}
+			}
+		}
+	}
+
+	if (IsAlive() && GetHealth() > m_MaxHealthVal)
+	{
+		if (gpGlobals->curtime > m_fTimeLastHealed + sv_decay_wait_time.GetFloat())
+		{
+			m_fDecayRemander += sv_decay_rate.GetFloat() * gpGlobals->frametime;
+
+			if (m_fDecayRemander >= 1 && GetHealth() != m_MaxHealthVal)
+			{
+				TakeHealth(-m_fDecayRemander, DMG_GENERIC);
+				m_fDecayRemander = 0;
+			}
+		}
+	}
+
+	if (m_ArmorValue <= 0)
+	{
+		m_nSkin = 0;
+	}
 }
 
 // handles touching physics objects
@@ -4930,84 +5891,95 @@ USES AND SETS GLOBAL g_pLastSpawn
 CBaseEntity *CBasePlayer::EntSelectSpawnPoint()
 {
 	CBaseEntity *pSpot;
+	CBaseEntity *pSpotFinder;
 	edict_t		*player;
 
 	player = edict();
 
-// choose a info_player_deathmatch point
-	if (g_pGameRules->IsCoOp())
+	pSpot = g_pLastSpawn;
+	pSpotFinder = NULL;
+
+	static const char* Team1Spawns[] = {
+		"info_player_rebel",
+		"info_player_terrorist",
+		"info_player_axis",
+	};
+	static const char* Team2Spawns[] = {
+		"info_player_combine",
+		"info_player_counterterrorist",
+		"info_player_allies",
+	};
+	COMPILE_TIME_ASSERT( ARRAYSIZE( Team1Spawns ) == ARRAYSIZE( Team2Spawns ) );
+	static const size_t MAX_TEAM_ATTEMPTS = ARRAYSIZE( Team1Spawns );
+	static const char* NonTeamSpawns[] = {
+		"info_player_deathmatch",
+		"info_player_start",
+	};
+	static const size_t MAX_NONTEAM_ATTEMPTS = ARRAYSIZE( NonTeamSpawns );
+
+	for (int Attempt = 0; !pSpotFinder && Attempt < MAX_TEAM_ATTEMPTS; ++Attempt)
 	{
-		pSpot = gEntList.FindEntityByClassname( g_pLastSpawn, "info_player_coop");
-		if ( pSpot )
-			goto ReturnSpot;
-		pSpot = gEntList.FindEntityByClassname( g_pLastSpawn, "info_player_start");
-		if ( pSpot ) 
-			goto ReturnSpot;
+		int TeamSpawn = random->RandomInt(0, 1);
+		const char** Spawns = TeamSpawn ? Team1Spawns : Team2Spawns;
+		
+		pSpotFinder = gEntList.FindEntityByClassname(pSpot, Spawns[Attempt]);
 	}
-	else if ( g_pGameRules->IsDeathmatch() )
+
+	for (int Attempt = 0; !pSpotFinder && Attempt < MAX_NONTEAM_ATTEMPTS; ++Attempt)
 	{
-		pSpot = g_pLastSpawn;
+		pSpotFinder = gEntList.FindEntityByClassname(pSpot, NonTeamSpawns[Attempt]);
+	}
+
+	if (pSpotFinder)
+	{
 		// Randomize the start spot
-		for ( int i = random->RandomInt(1,5); i > 0; i-- )
-			pSpot = gEntList.FindEntityByClassname( pSpot, "info_player_deathmatch" );
-		if ( !pSpot )  // skip over the null point
-			pSpot = gEntList.FindEntityByClassname( pSpot, "info_player_deathmatch" );
+		for (int i = random->RandomInt(1, 5); i > 0; i--)
+			pSpot = gEntList.FindEntityByClassname(pSpot, pSpotFinder->GetClassname());
+		if (!pSpot)  // skip over the null point
+			pSpot = gEntList.FindEntityByClassname(pSpot, pSpotFinder->GetClassname());
 
-		CBaseEntity *pFirstSpot = pSpot;
-
-		do 
+		if (pSpot)
 		{
-			if ( pSpot )
+			CBaseEntity *pFirstSpot = pSpot;
+
+			bool foundValidSpot = false;
+			do
 			{
 				// check if pSpot is valid
-				if ( g_pGameRules->IsSpawnPointValid( pSpot, this ) )
+				if (g_pGameRules->IsSpawnPointValid(pSpot, this) && pSpot->GetLocalOrigin() != vec3_origin)
 				{
-					if ( pSpot->GetLocalOrigin() == vec3_origin )
-					{
-						pSpot = gEntList.FindEntityByClassname( pSpot, "info_player_deathmatch" );
-						continue;
-					}
+					foundValidSpot = true;
+					break;
+				}
+				// increment pSpot
+				pSpot = gEntList.FindEntityByClassname(pSpot, pSpotFinder->GetClassname());
+			} while (pSpot != pFirstSpot); // loop if we're not back to the start
 
-					// if so, go to pSpot
-					goto ReturnSpot;
+			// we haven't found a place to spawn yet,  so kill any guy at the first spawn point and spawn there
+			if (!foundValidSpot)
+			{
+				CBaseEntity *ent = NULL;
+				for (CEntitySphereQuery sphere(pSpot->GetAbsOrigin(), 128); (ent = sphere.GetCurrentEntity()) != NULL; sphere.NextEntity())
+				{
+					// if ent is a client, kill em (unless they are ourselves)
+					if (ent->IsPlayer() && !(ent->edict() == player))
+						ent->TakeDamage(CTakeDamageInfo(GetContainingEntity(INDEXENT(0)), GetContainingEntity(INDEXENT(0)), 300, DMG_GENERIC));
 				}
 			}
-			// increment pSpot
-			pSpot = gEntList.FindEntityByClassname( pSpot, "info_player_deathmatch" );
-		} while ( pSpot != pFirstSpot ); // loop if we're not back to the start
-
-		// we haven't found a place to spawn yet,  so kill any guy at the first spawn point and spawn there
-		if ( pSpot )
-		{
-			CBaseEntity *ent = NULL;
-			for ( CEntitySphereQuery sphere( pSpot->GetAbsOrigin(), 128 ); (ent = sphere.GetCurrentEntity()) != NULL; sphere.NextEntity() )
-			{
-				// if ent is a client, kill em (unless they are ourselves)
-				if ( ent->IsPlayer() && !(ent->edict() == player) )
-					ent->TakeDamage( CTakeDamageInfo( GetContainingEntity(INDEXENT(0)), GetContainingEntity(INDEXENT(0)), 300, DMG_GENERIC ) );
-			}
-			goto ReturnSpot;
 		}
-	}
-
-	// If startspot is set, (re)spawn there.
-	if ( !gpGlobals->startspot || !strlen(STRING(gpGlobals->startspot)))
-	{
-		pSpot = FindPlayerStart( "info_player_start" );
-		if ( pSpot )
-			goto ReturnSpot;
 	}
 	else
 	{
-		pSpot = gEntList.FindEntityByName( NULL, gpGlobals->startspot );
-		if ( pSpot )
-			goto ReturnSpot;
+		pSpot = gEntList.FindEntityByName(NULL, gpGlobals->startspot);
+		if (!pSpot)
+		{
+			pSpot = g_pLastSpawn;
+		}
 	}
 
-ReturnSpot:
 	if ( !pSpot  )
 	{
-		Warning( "PutClientInServer: no info_player_start on level\n");
+		Warning( "PutClientInServer: no player spawn on level. Navigation mesh generation will not work!\n");
 		return CBaseEntity::Instance( INDEXENT( 0 ) );
 	}
 
@@ -5022,6 +5994,11 @@ void CBasePlayer::InitialSpawn( void )
 {
 	m_iConnected = PlayerConnected;
 	gamestats->Event_PlayerConnected( this );
+	
+	if (sv_player_startingmoney.GetBool())
+	{
+		SetMoney(sv_player_startingmoney_amount.GetInt());
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -5097,7 +6074,9 @@ void CBasePlayer::Spawn( void )
 
 	m_ArmorValue		= SpawnArmorValue();
 	SetBlocksLOS( false );
-	m_iMaxHealth		= m_iHealth;
+	m_iHealth = m_iHealth + m_MaxHealthValExtra;
+	m_iMaxHealth		= INT_MAX;
+	m_MaxHealthVal		= m_iHealth;
 
 	// Clear all flags except for FL_FULLEDICT
 	if ( GetFlags() & FL_FAKECLIENT )
@@ -5192,6 +6171,7 @@ void CBasePlayer::Spawn( void )
 #ifdef MAPBASE
 	CreateHandModel();
 #endif
+	CreateViewModel(VM_LEGS);
 
 	SetCollisionGroup( COLLISION_GROUP_PLAYER );
 
@@ -5252,6 +6232,8 @@ void CBasePlayer::Spawn( void )
 	{
 		g_pScriptVM->SetValue( "player", GetScriptInstance() );
 	}
+	
+	SetMaxArmorValue(sv_player_maxsuitpower.GetInt());
 }
 
 void CBasePlayer::Activate( void )
@@ -5276,10 +6258,19 @@ void CBasePlayer::Precache( void )
 	PrecacheScriptSound( "Player.Death" );
 	PrecacheScriptSound( "Player.PlasmaDamage" );
 	PrecacheScriptSound( "Player.SonicDamage" );
+	PrecacheScriptSound( "Player.BulletDamage");
 	PrecacheScriptSound( "Player.DrownStart" );
 	PrecacheScriptSound( "Player.DrownContinue" );
 	PrecacheScriptSound( "Player.Wade" );
 	PrecacheScriptSound( "Player.AmbientUnderWater" );
+	//Voice
+	PrecacheScriptSound( "Player.VoiceKill" );
+	PrecacheScriptSound( "Player.VoiceHit" );
+	PrecacheScriptSound( "Player.VoiceDeath" );
+	PrecacheScriptSound( "Player.VoicePerk" );
+	//store
+	PrecacheScriptSound("Store.Buy");
+	PrecacheScriptSound("Store.InsufficientFunds");
 	enginesound->PrecacheSentenceGroup( "HEV" );
 
 	// These are always needed
@@ -5462,6 +6453,11 @@ void CBasePlayer::SetArmorValue( int value )
 	m_ArmorValue = value;
 }
 
+void CBasePlayer::SetMaxArmorValue(int value)
+{
+	m_MaxArmorValue = value;
+}
+
 void CBasePlayer::IncrementArmorValue( int nCount, int nMaxValue )
 { 
 	m_ArmorValue += nCount;
@@ -5470,6 +6466,32 @@ void CBasePlayer::IncrementArmorValue( int nCount, int nMaxValue )
 		if (m_ArmorValue > nMaxValue)
 			m_ArmorValue = nMaxValue;
 	}
+}
+
+void CBasePlayer::IncrementMaxArmorValue(int nCount)
+{
+	m_MaxArmorValue += nCount;
+}
+
+void CBasePlayer::IncrementArmorValueNoMax(int nCount)
+{
+	m_ArmorValue += nCount;
+}
+
+void CBasePlayer::IncrementMaxHealthValue(int nCount)
+{
+	m_iMaxHealth += nCount;
+}
+
+void CBasePlayer::IncrementMaxHealthRegenValue(int nCount)
+{
+	m_MaxHealthValExtra += nCount;
+	m_MaxHealthVal += m_MaxHealthValExtra;
+}
+
+void CBasePlayer::IncrementHealthValue(int nCount)
+{
+	m_iHealth += nCount;
 }
 
 // used by the physics gun and game physics... is there a better interface?
@@ -5896,8 +6918,14 @@ CBaseEntity	*CBasePlayer::GiveNamedItem( const char *pszName, int iSubType )
 	pent->AddSpawnFlags( SF_NORESPAWN );
 
 	CBaseCombatWeapon *pWeapon = dynamic_cast<CBaseCombatWeapon*>( (CBaseEntity*)pent );
+	CBaseCombatWeapon *pActiveWeapon = GetActiveWeapon();
+
 	if ( pWeapon )
 	{
+		if (pActiveWeapon)
+		{
+			pActiveWeapon->Holster();
+		}
 		pWeapon->SetSubType( iSubType );
 	}
 
@@ -6392,19 +7420,28 @@ void CBasePlayer::CheatImpulseCommands( int iImpulse )
 		EquipSuit();
 
 		// Give the player everything!
-		GiveAmmo( 255,	"Pistol");
-		GiveAmmo( 255,	"AR2");
-		GiveAmmo( 5,	"AR2AltFire");
-		GiveAmmo( 255,	"SMG1");
-		GiveAmmo( 255,	"Buckshot");
-		GiveAmmo( 3,	"smg1_grenade");
-		GiveAmmo( 3,	"rpg_round");
-		GiveAmmo( 5,	"grenade");
-		GiveAmmo( 32,	"357" );
-		GiveAmmo( 16,	"XBowBolt" );
-#ifdef HL2_EPISODIC
-		GiveAmmo( 5,	"Hopwire" );
-#endif		
+		GiveAmmo( 999, "Pistol");
+		GiveAmmo( 999, "AR2" );
+		GiveAmmo( 999, "AR2AltFire" );
+		GiveAmmo( 999, "SMG1" );
+		GiveAmmo( 999, "Buckshot" );
+		GiveAmmo( 999, "smg1_grenade" );
+		GiveAmmo( 999, "rpg_round" );
+		GiveAmmo( 999, "grenade" );
+		GiveAmmo( 999, "357" );
+		GiveAmmo( 999, "XBowBolt" );
+		GiveAmmo( 999, "Sniper" );
+		GiveAmmo( 999, "Deagle" );
+		GiveAmmo( 999, "M249" );
+		GiveAmmo(999, "slam");
+		GiveAmmo(999, "OICW");
+		GiveAmmo(999, "OICW_Grenade");
+		GiveAmmo(999, "FlareRound");
+		GiveAmmo(999, "GaussEnergy");
+		GiveAmmo(999, "MP5Ammo");
+//#ifdef HL2_EPISODIC
+		//GiveAmmo( 999, "Hopwire" );
+//#endif		
 		GiveNamedItem( "weapon_smg1" );
 		GiveNamedItem( "weapon_frag" );
 		GiveNamedItem( "weapon_crowbar" );
@@ -6416,10 +7453,20 @@ void CBasePlayer::CheatImpulseCommands( int iImpulse )
 		GiveNamedItem( "weapon_rpg" );
 		GiveNamedItem( "weapon_357" );
 		GiveNamedItem( "weapon_crossbow" );
+		GiveNamedItem( "weapon_sniper_rifle" );
+		GiveNamedItem( "weapon_deagle" );
+		GiveNamedItem( "weapon_m249para" );
+		GiveNamedItem("weapon_slam");
+		GiveNamedItem("weapon_oicw");
+		GiveNamedItem("weapon_flaregun");
+		GiveNamedItem("weapon_knife");
+		GiveNamedItem("weapon_gauss");
+		GiveNamedItem("weapon_mp5");
+		GiveNamedItem("weapon_grapple");
 #ifdef HL2_EPISODIC
 		// GiveNamedItem( "weapon_magnade" );
 #endif
-		if ( GetHealth() < 100 )
+		if (GetHealth() < GetMaxHealth())
 		{
 			TakeHealth( 25, DMG_GENERIC );
 		}
@@ -6812,6 +7859,917 @@ bool CBasePlayer::ClientCommand( const CCommand &args )
 			pl->DumpPerfToRecipient( this, nRecords );
 		}
 		return true;
+	}
+	else if (stricmp(cmd, "toggle_ironsight") == 0)
+	{
+		CBaseCombatWeapon *pWeapon = GetActiveWeapon();
+		if (pWeapon != NULL)
+			pWeapon->ToggleIronsights();
+
+		return true;
+	}
+	else if (stricmp(cmd, "+ironsight") == 0)
+	{
+		CBaseCombatWeapon *pWeapon = GetActiveWeapon();
+		if (pWeapon != NULL)
+			pWeapon->EnableIronsights();
+
+		return true;
+	}
+	else if (stricmp(cmd, "-ironsight") == 0)
+	{
+		CBaseCombatWeapon *pWeapon = GetActiveWeapon();
+		if (pWeapon != NULL)
+			pWeapon->DisableIronsights();
+
+		return true;
+	}
+	else if (stricmp(cmd, "buymenuweapons") == 0)
+	{
+		if (!IsDead() && g_fr_economy.GetBool())
+		{
+			KeyValues *data = new KeyValues("data");
+			data->SetString("type", "1");			// show userdata from stringtable entry
+			ShowViewPortPanel(PANEL_BUY_WEAPONS, true, data);
+			if (!g_pGameRules->IsMultiplayer())
+			{
+				engine->ServerCommand("sv_cheats 1; host_timescale 0.05\n");
+			}
+		}
+		else
+		{
+			if (sv_store_denynotifications.GetBool())
+			{
+				CFmtStr hint;
+				hint.sprintf("#Valve_StoreUseDenyNoEconomy");
+				ShowLevelMessage(hint.Access());
+			}
+			if (sv_store_denysounds.GetBool())
+			{
+				EmitSound("Store.InsufficientFunds");
+			}
+		}
+		return true;
+	}
+	else if (stricmp(cmd, "buymenuammo") == 0)
+	{
+		if (!IsDead() && g_fr_economy.GetBool())
+		{
+			KeyValues *data = new KeyValues("data");
+			data->SetString("type", "1");			// show userdata from stringtable entry
+			ShowViewPortPanel(PANEL_BUY_AMMO, true, data);
+			if (!g_pGameRules->IsMultiplayer())
+			{
+				engine->ServerCommand("sv_cheats 1; host_timescale 0.05\n");
+			}
+		}
+		else
+		{
+			if (sv_store_denynotifications.GetBool())
+			{
+				CFmtStr hint;
+				hint.sprintf("#Valve_StoreUseDenyNoEconomy");
+				ShowLevelMessage(hint.Access());
+			}
+			if (sv_store_denysounds.GetBool())
+			{
+				EmitSound("Store.InsufficientFunds");
+			}
+		}
+		return true;
+	}
+	else if (stricmp(cmd, "buymenusupplies") == 0)
+	{
+		if (!IsDead() && g_fr_economy.GetBool())
+		{
+			KeyValues *data = new KeyValues("data");
+			data->SetString("type", "1");			// show userdata from stringtable entry
+			ShowViewPortPanel(PANEL_BUY_SUPPLIES, true, data);
+			if (!g_pGameRules->IsMultiplayer())
+			{
+				engine->ServerCommand("sv_cheats 1; host_timescale 0.05\n");
+			}
+		}
+		else
+		{
+			if (sv_store_denynotifications.GetBool())
+			{
+				CFmtStr hint;
+				hint.sprintf("#Valve_StoreUseDenyNoEconomy");
+				ShowLevelMessage(hint.Access());
+			}
+			if (sv_store_denysounds.GetBool())
+			{
+				EmitSound("Store.InsufficientFunds");
+			}
+		}
+		return true;
+	}
+	else if (stricmp(cmd, "buymenu") == 0)
+	{
+		if (!IsDead() && g_fr_economy.GetBool())
+		{
+			KeyValues *data = new KeyValues("data");
+			data->SetString("type", "1");			// show userdata from stringtable entry
+			ShowViewPortPanel(PANEL_BUY, true, data);
+			if (!g_pGameRules->IsMultiplayer())
+			{
+				engine->ServerCommand("sv_cheats 1; host_timescale 0.05\n");
+			}
+		}
+		else
+		{
+			if (sv_store_denynotifications.GetBool())
+			{
+				CFmtStr hint;
+				hint.sprintf("#Valve_StoreUseDenyNoEconomy");
+				ShowLevelMessage(hint.Access());
+			}
+			if (sv_store_denysounds.GetBool())
+			{
+				EmitSound("Store.InsufficientFunds");
+			}
+		}
+		return true;
+	}
+	else if (stricmp(cmd, "storecancel") == 0)
+	{
+		if (!g_pGameRules->IsMultiplayer())
+		{
+			engine->ServerCommand("sv_cheats 1; host_timescale 1\n");
+		}
+		return true;
+	}
+	else if (stricmp(cmd, "buyitem") == 0)
+	{
+		if (!IsDead() && g_fr_economy.GetBool())
+		{
+			int moneyAmount = atoi(args[2]);
+			int canGetMultiple = atoi(args[3]);
+			int menuID = atoi(args[4]);
+			if (GetMoney() < moneyAmount)
+			{
+				if (sv_store_denynotifications.GetBool())
+				{
+					CFmtStr hint;
+					hint.sprintf("#Valve_StoreBuyDenyInsufficentFunds");
+					ShowLevelMessage(hint.Access());
+				}
+				if (sv_store_denysounds.GetBool())
+				{
+					EmitSound("Store.InsufficientFunds");
+				}
+			}
+			else if (HasNamedPlayerItem(args[1]) && canGetMultiple == 0)
+			{
+				if (sv_store_denynotifications.GetBool())
+				{
+					CFmtStr hint;
+					hint.sprintf("#Valve_StoreBuyDenyAlreadyHasItem");
+					ShowLevelMessage(hint.Access());
+				}
+				if (sv_store_denysounds.GetBool())
+				{
+					EmitSound("Store.InsufficientFunds");
+				}
+			}
+			else
+			{
+				if (sv_store_buynotifications.GetBool())
+				{
+					CFmtStr hint;
+					hint.sprintf("#Valve_StoreBuySuccessItem");
+					ShowLevelMessage(hint.Access());
+				}
+				GiveNamedItem(args[1]);
+				RemoveMoney(moneyAmount);
+				if (sv_store_buysounds.GetBool())
+				{
+					EmitSound("Store.Buy");
+				}
+			}
+
+			if (menuID == 1)
+			{
+				KeyValues *data = new KeyValues("data");
+				data->SetString("type", "1");			// show userdata from stringtable entry
+				ShowViewPortPanel(PANEL_BUY_SUPPLIES, true, data);
+			}
+			else if (menuID == 2)
+			{
+				KeyValues *data = new KeyValues("data");
+				data->SetString("type", "1");			// show userdata from stringtable entry
+				ShowViewPortPanel(PANEL_BUY_AMMO, true, data);
+			}
+			else if (menuID == 3)
+			{
+				KeyValues *data = new KeyValues("data");
+				data->SetString("type", "1");			// show userdata from stringtable entry
+				ShowViewPortPanel(PANEL_BUY_WEAPONS, true, data);
+			}
+		}
+		else
+		{
+			if (sv_store_denynotifications.GetBool())
+			{
+				CFmtStr hint;
+				hint.sprintf("#Valve_StoreBuyDenyNoEconomy");
+				ShowLevelMessage(hint.Access());
+			}
+			if (sv_store_denysounds.GetBool())
+			{
+				EmitSound("Store.InsufficientFunds");
+			}
+		}
+		return true;
+	}
+	else if (stricmp(cmd, "buyammo") == 0)
+	{
+		if (!IsDead() && g_fr_economy.GetBool())
+		{
+			int moneyAmount = atoi(args[3]);
+			int menuID = atoi(args[4]);
+			if (GetMoney() < moneyAmount)
+			{
+				if (sv_store_denynotifications.GetBool())
+				{
+					CFmtStr hint;
+					hint.sprintf("#Valve_StoreBuyDenyInsufficentFunds");
+					ShowLevelMessage(hint.Access());
+				}
+				if (sv_store_denysounds.GetBool())
+				{
+					EmitSound("Store.InsufficientFunds");
+				}
+			}
+			else
+			{
+				if (sv_store_buynotifications.GetBool())
+				{
+					CFmtStr hint;
+					hint.sprintf("#Valve_StoreBuySuccessItem");
+					ShowLevelMessage(hint.Access());
+				}
+				GiveAmmo(atoi(args[2]), args[1]);
+				RemoveMoney(moneyAmount);
+				if (sv_store_buysounds.GetBool())
+				{
+					EmitSound("Store.Buy");
+				}
+			}
+
+			if (menuID == 1)
+			{
+				KeyValues *data = new KeyValues("data");
+				data->SetString("type", "1");			// show userdata from stringtable entry
+				ShowViewPortPanel(PANEL_BUY_SUPPLIES, true, data);
+			}
+			else if (menuID == 2)
+			{
+				KeyValues *data = new KeyValues("data");
+				data->SetString("type", "1");			// show userdata from stringtable entry
+				ShowViewPortPanel(PANEL_BUY_AMMO, true, data);
+			}
+			else if (menuID == 3)
+			{
+				KeyValues *data = new KeyValues("data");
+				data->SetString("type", "1");			// show userdata from stringtable entry
+				ShowViewPortPanel(PANEL_BUY_WEAPONS, true, data);
+			}
+		}
+		else
+		{
+			if (sv_store_denynotifications.GetBool())
+			{
+				CFmtStr hint;
+				hint.sprintf("#Valve_StoreBuyDenyNoEconomy");
+				ShowLevelMessage(hint.Access());
+			}
+			if (sv_store_denysounds.GetBool())
+			{
+				EmitSound("Store.InsufficientFunds");
+			}
+		}
+		return true;
+	}
+	else if (stricmp(cmd, "buyhealth") == 0)
+	{
+		if (!IsDead() && g_fr_economy.GetBool())
+		{
+			int moneyAmount = atoi(args[2]);
+			int menuID = atoi(args[3]);
+			if (GetMoney() < moneyAmount)
+			{
+				if (sv_store_denynotifications.GetBool())
+				{
+					CFmtStr hint;
+					hint.sprintf("#Valve_StoreBuyDenyInsufficentFunds");
+					ShowLevelMessage(hint.Access());
+				}
+				if (sv_store_denysounds.GetBool())
+				{
+					EmitSound("Store.InsufficientFunds");
+				}
+			}
+			else
+			{
+				if (sv_store_buynotifications.GetBool())
+				{
+					CFmtStr hint;
+					hint.sprintf("#Valve_StoreBuySuccessItem");
+					ShowLevelMessage(hint.Access());
+				}
+				TakeHealth(atoi(args[1]), DMG_GENERIC);
+				CSingleUserRecipientFilter user(this);
+				user.MakeReliable();
+
+				UserMessageBegin(user, "ItemPickup");
+				WRITE_STRING("item_healthkit");
+				MessageEnd();
+
+				CPASAttenuationFilter filter(this, "HealthKit.Touch");
+				EmitSound(filter, entindex(), "HealthKit.Touch");
+				RemoveMoney(moneyAmount);
+				if (sv_store_buysounds.GetBool())
+				{
+					EmitSound("Store.Buy");
+				}
+			}
+
+			if (menuID == 1)
+			{
+				KeyValues *data = new KeyValues("data");
+				data->SetString("type", "1");			// show userdata from stringtable entry
+				ShowViewPortPanel(PANEL_BUY_SUPPLIES, true, data);
+			}
+			else if (menuID == 2)
+			{
+				KeyValues *data = new KeyValues("data");
+				data->SetString("type", "1");			// show userdata from stringtable entry
+				ShowViewPortPanel(PANEL_BUY_AMMO, true, data);
+			}
+			else if (menuID == 3)
+			{
+				KeyValues *data = new KeyValues("data");
+				data->SetString("type", "1");			// show userdata from stringtable entry
+				ShowViewPortPanel(PANEL_BUY_WEAPONS, true, data);
+			}
+		}
+		else
+		{
+			if (sv_store_denynotifications.GetBool())
+			{
+				CFmtStr hint;
+				hint.sprintf("#Valve_StoreBuyDenyNoEconomy");
+				ShowLevelMessage(hint.Access());
+			}
+			if (sv_store_denysounds.GetBool())
+			{
+				EmitSound("Store.InsufficientFunds");
+			}
+		}
+		return true;
+	}
+	else if (stricmp(cmd, "buyhealthkit") == 0)
+	{
+		if (!IsDead() && g_fr_economy.GetBool())
+		{
+			int moneyAmount = atoi(args[1]);
+			int menuID = atoi(args[2]);
+			if (GetMoney() < moneyAmount)
+			{
+				if (sv_store_denynotifications.GetBool())
+				{
+					CFmtStr hint;
+					hint.sprintf("#Valve_StoreBuyDenyInsufficentFunds");
+					ShowLevelMessage(hint.Access());
+				}
+				if (sv_store_denysounds.GetBool())
+				{
+					EmitSound("Store.InsufficientFunds");
+				}
+			}
+			else
+			{
+				if (sv_store_buynotifications.GetBool())
+				{
+					CFmtStr hint;
+					hint.sprintf("#Valve_StoreBuySuccessItem");
+					ShowLevelMessage(hint.Access());
+				}
+				TakeHealth(sk_healthkit.GetInt(), DMG_GENERIC);
+				CSingleUserRecipientFilter user(this);
+				user.MakeReliable();
+
+				UserMessageBegin(user, "ItemPickup");
+				WRITE_STRING("item_healthkit");
+				MessageEnd();
+
+				CPASAttenuationFilter filter(this, "HealthKit.Touch");
+				EmitSound(filter, entindex(), "HealthKit.Touch");
+				RemoveMoney(moneyAmount);
+				if (sv_store_buysounds.GetBool())
+				{
+					EmitSound("Store.Buy");
+				}
+			}
+
+			if (menuID == 1)
+			{
+				KeyValues *data = new KeyValues("data");
+				data->SetString("type", "1");			// show userdata from stringtable entry
+				ShowViewPortPanel(PANEL_BUY_SUPPLIES, true, data);
+			}
+			else if (menuID == 2)
+			{
+				KeyValues *data = new KeyValues("data");
+				data->SetString("type", "1");			// show userdata from stringtable entry
+				ShowViewPortPanel(PANEL_BUY_AMMO, true, data);
+			}
+			else if (menuID == 3)
+			{
+				KeyValues *data = new KeyValues("data");
+				data->SetString("type", "1");			// show userdata from stringtable entry
+				ShowViewPortPanel(PANEL_BUY_WEAPONS, true, data);
+			}
+		}
+		else
+		{
+			if (sv_store_denynotifications.GetBool())
+			{
+				CFmtStr hint;
+				hint.sprintf("#Valve_StoreBuyDenyNoEconomy");
+				ShowLevelMessage(hint.Access());
+			}
+			if (sv_store_denysounds.GetBool())
+			{
+				EmitSound("Store.InsufficientFunds");
+			}
+		}
+		return true;
+	}
+	else if (stricmp(cmd, "buyarmor") == 0)
+	{
+		if (!IsDead() && g_fr_economy.GetBool())
+		{
+			int moneyAmount = atoi(args[2]);
+			int menuID = atoi(args[3]);
+			if (GetMoney() < moneyAmount)
+			{
+				if (sv_store_denynotifications.GetBool())
+				{
+					CFmtStr hint;
+					hint.sprintf("#Valve_StoreBuyDenyInsufficentFunds");
+					ShowLevelMessage(hint.Access());
+				}
+				if (sv_store_denysounds.GetBool())
+				{
+					EmitSound("Store.InsufficientFunds");
+				}
+			}
+			else
+			{
+				if (sv_store_buynotifications.GetBool())
+				{
+					CFmtStr hint;
+					hint.sprintf("#Valve_StoreBuySuccessItem");
+					ShowLevelMessage(hint.Access());
+				}
+				IncrementArmorValue(atoi(args[1]), GetMaxArmorValue());
+				CPASAttenuationFilter filter(this, "ItemBattery.Touch");
+				EmitSound(filter, entindex(), "ItemBattery.Touch");
+
+				CSingleUserRecipientFilter user(this);
+				user.MakeReliable();
+
+				UserMessageBegin(user, "ItemPickup");
+				WRITE_STRING("item_battery");
+				MessageEnd();
+				RemoveMoney(moneyAmount);
+				if (sv_store_buysounds.GetBool())
+				{
+					EmitSound("Store.Buy");
+				}
+			}
+
+			if (menuID == 1)
+			{
+				KeyValues *data = new KeyValues("data");
+				data->SetString("type", "1");			// show userdata from stringtable entry
+				ShowViewPortPanel(PANEL_BUY_SUPPLIES, true, data);
+			}
+			else if (menuID == 2)
+			{
+				KeyValues *data = new KeyValues("data");
+				data->SetString("type", "1");			// show userdata from stringtable entry
+				ShowViewPortPanel(PANEL_BUY_AMMO, true, data);
+			}
+			else if (menuID == 3)
+			{
+				KeyValues *data = new KeyValues("data");
+				data->SetString("type", "1");			// show userdata from stringtable entry
+				ShowViewPortPanel(PANEL_BUY_WEAPONS, true, data);
+			}
+		}
+		else
+		{
+			if (sv_store_denynotifications.GetBool())
+			{
+				CFmtStr hint;
+				hint.sprintf("#Valve_StoreBuyDenyNoEconomy");
+				ShowLevelMessage(hint.Access());
+			}
+			if (sv_store_denysounds.GetBool())
+			{
+				EmitSound("Store.InsufficientFunds");
+			}
+		}
+		return true;
+	}
+	else if (stricmp(cmd, "buybattery") == 0)
+	{
+		if (!IsDead() && g_fr_economy.GetBool())
+		{
+			int moneyAmount = atoi(args[1]);
+			int menuID = atoi(args[2]);
+			if (GetMoney() < moneyAmount)
+			{
+				if (sv_store_denynotifications.GetBool())
+				{
+					CFmtStr hint;
+					hint.sprintf("#Valve_StoreBuyDenyInsufficentFunds");
+					ShowLevelMessage(hint.Access());
+				}
+				if (sv_store_denysounds.GetBool())
+				{
+					EmitSound("Store.InsufficientFunds");
+				}
+			}
+			else
+			{
+				if (sv_store_buynotifications.GetBool())
+				{
+					CFmtStr hint;
+					hint.sprintf("#Valve_StoreBuySuccessItem");
+					ShowLevelMessage(hint.Access());
+				}
+				IncrementArmorValue(sk_battery.GetInt(), GetMaxArmorValue());
+				CPASAttenuationFilter filter(this, "ItemBattery.Touch");
+				EmitSound(filter, entindex(), "ItemBattery.Touch");
+
+				CSingleUserRecipientFilter user(this);
+				user.MakeReliable();
+
+				UserMessageBegin(user, "ItemPickup");
+				WRITE_STRING("item_battery");
+				MessageEnd();
+				RemoveMoney(moneyAmount);
+				if (sv_store_buysounds.GetBool())
+				{
+					EmitSound("Store.Buy");
+				}
+			}
+
+			if (menuID == 1)
+			{
+				KeyValues *data = new KeyValues("data");
+				data->SetString("type", "1");			// show userdata from stringtable entry
+				ShowViewPortPanel(PANEL_BUY_SUPPLIES, true, data);
+			}
+			else if (menuID == 2)
+			{
+				KeyValues *data = new KeyValues("data");
+				data->SetString("type", "1");			// show userdata from stringtable entry
+				ShowViewPortPanel(PANEL_BUY_AMMO, true, data);
+			}
+			else if (menuID == 3)
+			{
+				KeyValues *data = new KeyValues("data");
+				data->SetString("type", "1");			// show userdata from stringtable entry
+				ShowViewPortPanel(PANEL_BUY_WEAPONS, true, data);
+			}
+		}
+		else
+		{
+			if (sv_store_denynotifications.GetBool())
+			{
+				CFmtStr hint;
+				hint.sprintf("#Valve_StoreBuyDenyNoEconomy");
+				ShowLevelMessage(hint.Access());
+			}
+			if (sv_store_denysounds.GetBool())
+			{
+				EmitSound("Store.InsufficientFunds");
+			}
+		}
+		return true;
+	}
+	else if (stricmp(cmd, "buyupgrade") == 0)
+	{
+		if (!IsDead() && g_fr_economy.GetBool())
+		{
+			int upgradeID = atoi(args[1]);
+			int moneyAmount = atoi(args[2]);
+			int menuID = atoi(args[3]);
+
+			if (GetMoney() < moneyAmount)
+			{
+				if (sv_store_denynotifications.GetBool())
+				{
+					CFmtStr hint;
+					hint.sprintf("#Valve_StoreBuyDenyInsufficentFunds");
+					ShowLevelMessage(hint.Access());
+				}
+				if (sv_store_denysounds.GetBool())
+				{
+					EmitSound("Store.InsufficientFunds");
+				}
+			}
+			else
+			{
+				//right now we only have the max health upgrade.
+				if (upgradeID == FIREFIGHT_UPGRADE_MAXHEALTH)
+				{
+					if (m_iHealthUpgrades < sv_fr_maxhealthupgrades.GetInt())
+					{
+						if (sv_store_buynotifications.GetBool())
+						{
+							CFmtStr hint;
+							hint.sprintf("#Valve_StoreBuySuccessUpgrade");
+							ShowLevelMessage(hint.Access());
+						}
+
+						Market_SetMaxHealth();
+
+						RemoveMoney(moneyAmount);
+						if (sv_store_buysounds.GetBool())
+						{
+							EmitSound("Store.Buy");
+						}
+					}
+					else
+					{
+						if (sv_store_denynotifications.GetBool())
+						{
+							CFmtStr hint;
+							hint.sprintf("#Valve_StoreBuyDenyTooManyUpgrades");
+							ShowLevelMessage(hint.Access());
+						}
+
+						if(sv_store_denysounds.GetBool())
+						{
+							EmitSound("Store.InsufficientFunds");
+						}
+					}
+				}
+			}
+
+			if (menuID == 1)
+			{
+				KeyValues *data = new KeyValues("data");
+				data->SetString("type", "1");			// show userdata from stringtable entry
+				ShowViewPortPanel(PANEL_BUY_SUPPLIES, true, data);
+			}
+			else if (menuID == 2)
+			{
+				KeyValues *data = new KeyValues("data");
+				data->SetString("type", "1");			// show userdata from stringtable entry
+				ShowViewPortPanel(PANEL_BUY_AMMO, true, data);
+			}
+			else if (menuID == 3)
+			{
+				KeyValues *data = new KeyValues("data");
+				data->SetString("type", "1");			// show userdata from stringtable entry
+				ShowViewPortPanel(PANEL_BUY_WEAPONS, true, data);
+			}
+		}
+		else
+		{
+			if (sv_store_denynotifications.GetBool())
+			{
+				CFmtStr hint;
+				hint.sprintf("#Valve_StoreBuyDenyNoEconomy");
+				ShowLevelMessage(hint.Access());
+			}
+			if (sv_store_denysounds.GetBool())
+			{
+				EmitSound("Store.InsufficientFunds");
+			}
+		}
+		return true;
+	}
+	else if (stricmp(cmd, "buycallclientcmd") == 0)
+	{
+		if (!IsDead() && g_fr_economy.GetBool())
+		{
+			int moneyAmount = atoi(args[2]);
+			int canGetMultiple = atoi(args[3]);
+			int menuID = atoi(args[4]);
+			if (GetMoney() < moneyAmount)
+			{
+				if (sv_store_denynotifications.GetBool())
+				{
+					CFmtStr hint;
+					hint.sprintf("#Valve_StoreBuyDenyInsufficentFunds");
+					ShowLevelMessage(hint.Access());
+				}
+				if (sv_store_denysounds.GetBool())
+				{
+					EmitSound("Store.InsufficientFunds");
+				}
+			}
+			else if (HasNamedPlayerItem(args[1]) && canGetMultiple == 0)
+			{
+				if (sv_store_denynotifications.GetBool())
+				{
+					CFmtStr hint;
+					hint.sprintf("#Valve_StoreBuyDenyAlreadyHasItem");
+					ShowLevelMessage(hint.Access());
+				}
+				if (sv_store_denysounds.GetBool())
+				{
+					EmitSound("Store.InsufficientFunds");
+				}
+			}
+			else
+			{
+				if (sv_store_buynotifications.GetBool())
+				{
+					CFmtStr hint;
+					hint.sprintf("#Valve_StoreBuySuccessItem");
+					ShowLevelMessage(hint.Access());
+				}
+				engine->ClientCommand(edict(), args[1]);
+				RemoveMoney(moneyAmount);
+				if (sv_store_buysounds.GetBool())
+				{
+					EmitSound("Store.Buy");
+				}
+			}
+
+			if (menuID == 1)
+			{
+				KeyValues *data = new KeyValues("data");
+				data->SetString("type", "1");			// show userdata from stringtable entry
+				ShowViewPortPanel(PANEL_BUY_SUPPLIES, true, data);
+			}
+			else if (menuID == 2)
+			{
+				KeyValues *data = new KeyValues("data");
+				data->SetString("type", "1");			// show userdata from stringtable entry
+				ShowViewPortPanel(PANEL_BUY_AMMO, true, data);
+			}
+			else if (menuID == 3)
+			{
+				KeyValues *data = new KeyValues("data");
+				data->SetString("type", "1");			// show userdata from stringtable entry
+				ShowViewPortPanel(PANEL_BUY_WEAPONS, true, data);
+			}
+		}
+		else
+		{
+			if (sv_store_denynotifications.GetBool())
+			{
+				CFmtStr hint;
+				hint.sprintf("#Valve_StoreBuyDenyNoEconomy");
+				ShowLevelMessage(hint.Access());
+			}
+			if (sv_store_denysounds.GetBool())
+			{
+				EmitSound("Store.InsufficientFunds");
+			}
+		}
+		return true;
+	}
+	else if (stricmp(cmd, "buycallservercmd") == 0)
+	{
+		if (!IsDead() && g_fr_economy.GetBool())
+		{
+			int moneyAmount = atoi(args[2]);
+			int canGetMultiple = atoi(args[3]);
+			int menuID = atoi(args[4]);
+			if (GetMoney() < moneyAmount)
+			{
+				if (sv_store_denynotifications.GetBool())
+				{
+					CFmtStr hint;
+					hint.sprintf("#Valve_StoreBuyDenyInsufficentFunds");
+					ShowLevelMessage(hint.Access());
+				}
+				if (sv_store_denysounds.GetBool())
+				{
+					EmitSound("Store.InsufficientFunds");
+				}
+			}
+			else if (HasNamedPlayerItem(args[1]) && canGetMultiple == 0)
+			{
+				if (sv_store_denynotifications.GetBool())
+				{
+					CFmtStr hint;
+					hint.sprintf("#Valve_StoreBuyDenyAlreadyHasItem");
+					ShowLevelMessage(hint.Access());
+				}
+				if (sv_store_denysounds.GetBool())
+				{
+					EmitSound("Store.InsufficientFunds");
+				}
+			}
+			else
+			{
+				if (sv_store_buynotifications.GetBool())
+				{
+					CFmtStr hint;
+					hint.sprintf("#Valve_StoreBuySuccessItem");
+					ShowLevelMessage(hint.Access());
+				}
+				engine->ServerCommand(args[1]);
+				RemoveMoney(moneyAmount);
+				if (sv_store_buysounds.GetBool())
+				{
+					EmitSound("Store.Buy");
+				}
+			}
+
+			if (menuID == 1)
+			{
+				KeyValues *data = new KeyValues("data");
+				data->SetString("type", "1");			// show userdata from stringtable entry
+				ShowViewPortPanel(PANEL_BUY_SUPPLIES, true, data);
+			}
+			else if (menuID == 2)
+			{
+				KeyValues *data = new KeyValues("data");
+				data->SetString("type", "1");			// show userdata from stringtable entry
+				ShowViewPortPanel(PANEL_BUY_AMMO, true, data);
+			}
+			else if (menuID == 3)
+			{
+				KeyValues *data = new KeyValues("data");
+				data->SetString("type", "1");			// show userdata from stringtable entry
+				ShowViewPortPanel(PANEL_BUY_WEAPONS, true, data);
+			}
+		}
+		else
+		{
+			if (sv_store_denynotifications.GetBool())
+			{
+				CFmtStr hint;
+				hint.sprintf("#Valve_StoreBuyDenyNoEconomy");
+				ShowLevelMessage(hint.Access());
+			}
+			if (sv_store_denysounds.GetBool())
+			{
+				EmitSound("Store.InsufficientFunds");
+			}
+		}
+		return true;
+	}
+	else if (stricmp(cmd, "moddingmenu") == 0)
+	{
+		KeyValues *data = new KeyValues("data");
+		data->SetString("type", "1");			// show userdata from stringtable entry
+		ShowViewPortPanel(PANEL_MODDING_MAIN, true, data);
+		return true;
+	}
+	else if (stricmp(cmd, "moddingmenumapping") == 0)
+	{
+		KeyValues *data = new KeyValues("data");
+		data->SetString("type", "1");			// show userdata from stringtable entry
+		ShowViewPortPanel(PANEL_MODDING_MAPPING, true, data);
+		return true;
+	}
+	else if (stricmp(cmd, "moddingmenumappingmapadd") == 0)
+	{
+		KeyValues *data = new KeyValues("data");
+		data->SetString("type", "1");			// show userdata from stringtable entry
+		ShowViewPortPanel(PANEL_MODDING_MAPADD, true, data);
+		return true;
+	}
+	else if (stricmp(cmd, "moddingmenumappingnoding") == 0)
+	{
+		KeyValues *data = new KeyValues("data");
+		data->SetString("type", "1");			// show userdata from stringtable entry
+		ShowViewPortPanel(PANEL_MODDING_NODING, true, data);
+		return true;
+	}
+	else if (stricmp(cmd, "moddingmenuweapons") == 0)
+	{
+		KeyValues *data = new KeyValues("data");
+		data->SetString("type", "1");			// show userdata from stringtable entry
+		ShowViewPortPanel(PANEL_MODDING_WEAPONS, true, data);
+		return true;
+	}
+	else if (stricmp(cmd, "givemapadditems") == 0)
+	{
+		GiveNamedItem("weapon_positiongrabber");
+		return true;
+	}
+	else if (stricmp(cmd, "ironsightedit") == 0)
+	{
+		engine->ServerCommand("exec ironsite_cfg.cfg\n");
+		CFmtStr hint;
+		hint.sprintf("#FIREFIGHTRELOADED_Modding_IronsightHint");
+		UTIL_HudHintText(this, hint.Access());
 	}
 
 	return false;
@@ -7242,7 +9200,7 @@ bool CBasePlayer::ShouldAutoaim( void )
 		return false;
 
 	// autoaiming is only for easy and medium skill
-	return ( IsX360() || !g_pGameRules->IsSkillLevel(SKILL_HARD) );
+	return (IsX360() || !g_pGameRules->IsSkillLevel(SKILL_HARD) || !g_pGameRules->IsSkillLevel(SKILL_VERYHARD) || !g_pGameRules->IsSkillLevel(SKILL_NIGHTMARE));
 }
 
 //-----------------------------------------------------------------------------
@@ -8023,7 +9981,14 @@ void CStripWeapons::StripWeapons(inputdata_t &data, bool stripSuit)
 	}
 	else if ( !g_pGameRules->IsDeathmatch() )
 	{
-		pPlayer = UTIL_GetLocalPlayer();
+		for (int i = 1; i <= gpGlobals->maxClients; i++)
+		{
+			CBasePlayer *pPlayer = UTIL_PlayerByIndex(i);
+			if (pPlayer)
+			{
+				pPlayer->RemoveAllItems(stripSuit);
+			}
+		}
 	}
 
 	if ( pPlayer )
@@ -8119,17 +10084,22 @@ void CRevertSaved::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE 
 	SetNextThink( gpGlobals->curtime + LoadTime() );
 	SetThink( &CRevertSaved::LoadThink );
 
-	CBasePlayer *pPlayer = UTIL_GetLocalPlayer();
-
-	if ( pPlayer )
+	for (int i = 1; i <= gpGlobals->maxClients; i++)
 	{
-		//Adrian: Setting this flag so we can't move or save a game.
-		pPlayer->pl.deadflag = true;
-		pPlayer->AddFlag( (FL_NOTARGET|FL_FROZEN) );
+		CBasePlayer *pPlayer = UTIL_PlayerByIndex(i);
+		if (!pPlayer)
+			continue;
 
-		// clear any pending autosavedangerous
-		g_ServerGameDLL.m_fAutoSaveDangerousTime = 0.0f;
-		g_ServerGameDLL.m_fAutoSaveDangerousMinHealthToCommit = 0.0f;
+		if (pPlayer)
+		{
+			//Adrian: Setting this flag so we can't move or save a game.
+			pPlayer->pl.deadflag = true;
+			pPlayer->AddFlag((FL_NOTARGET | FL_FROZEN));
+
+			// clear any pending autosavedangerous
+			g_ServerGameDLL.m_fAutoSaveDangerousTime = 0.0f;
+			g_ServerGameDLL.m_fAutoSaveDangerousMinHealthToCommit = 0.0f;
+		}
 	}
 }
 
@@ -8180,6 +10150,13 @@ void CRevertSaved::LoadThink( void )
 	if ( !gpGlobals->deathmatch )
 	{
 		engine->ServerCommand("reload\n");
+	}
+	else
+	{
+		char *szDefaultMapName = new char[32];
+		Q_strncpy(szDefaultMapName, STRING(gpGlobals->mapname), 32);
+		engine->ChangeLevel(szDefaultMapName, NULL);
+		return;
 	}
 }
 
@@ -8287,7 +10264,7 @@ void CMovementSpeedMod::InputSpeedMod(inputdata_t &data)
 	}
 	else if ( !g_pGameRules->IsDeathmatch() )
 	{
-		pPlayer = UTIL_GetLocalPlayer();
+		pPlayer = UTIL_GetNearestPlayer(GetAbsOrigin());
 	}
 
 	if ( pPlayer )
@@ -8682,6 +10659,12 @@ void SendProxy_ShiftPlayerSpawnflags( const SendProp *pProp, const void *pStruct
 		SendPropEHandle	(SENDINFO(m_hZoomOwner) ),
 		SendPropArray	( SendPropEHandle( SENDINFO_ARRAY( m_hViewModel ) ), m_hViewModel ),
 		SendPropString	(SENDINFO(m_szLastPlaceName) ),
+		SendPropInt     (SENDINFO(m_iExp)),
+		SendPropInt     (SENDINFO(m_iLevel)),
+		SendPropInt     (SENDINFO(m_iFrags)),
+		SendPropInt     (SENDINFO(m_iMaxExp)),
+		SendPropInt		(SENDINFO(m_iPerkInfiniteAmmo)),
+		SendPropInt		(SENDINFO(m_iMoney)),
 
 #if defined USES_ECON_ITEMS
 		SendPropUtlVector( SENDINFO_UTLVECTOR( m_hMyWearables ), MAX_WEARABLES_SENT_FROM_SERVER, SendPropEHandle( NULL, 0 ) ),
@@ -9656,8 +11639,8 @@ void CBasePlayer::HandleAnimEvent( animevent_t *pEvent )
 		if ( pEvent->event == AE_RAGDOLL )
 		{
 			// Convert to ragdoll immediately
-			CreateRagdollEntity();
-			BecomeRagdollOnClient( vec3_origin );
+			//CreateRagdollEntity();
+			//BecomeRagdollOnClient( vec3_origin );
  
 			// Force the player to start death thinking
 			SetThink(&CBasePlayer::PlayerDeathThink);

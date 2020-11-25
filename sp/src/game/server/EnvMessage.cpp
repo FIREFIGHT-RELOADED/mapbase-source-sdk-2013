@@ -105,7 +105,7 @@ void CMessage::InputShowMessage( inputdata_t &inputdata )
 		}
 		else
 		{
-			pPlayer = (gpGlobals->maxClients > 1) ? NULL : UTIL_GetLocalPlayer();
+			pPlayer = UTIL_GetLocalPlayer(); // just show it to the host, if there is one 
 		}
 
 		if ( pPlayer && pPlayer->IsPlayer() )
@@ -226,14 +226,12 @@ void CCredits::OnRestore()
 
 void CCredits::RollOutroCredits()
 {
-	sv_unlockedchapters.SetValue( "15" );
-	
-	CBasePlayer *pPlayer = UTIL_GetLocalPlayer();
+	sv_unlockedchapters.SetValue( "99" );
 
-	CSingleUserRecipientFilter user( pPlayer );
-	user.MakeReliable();
-
-	UserMessageBegin( user, "CreditsMsg" );
+	CRecipientFilter filter;
+	filter.AddAllPlayers();
+	filter.MakeReliable();
+	UserMessageBegin(filter, "CreditsMsg");
 		WRITE_BYTE( 3 );
 #ifdef MAPBASE
 		WRITE_STRING( STRING(m_iszCreditsFile) );
@@ -253,14 +251,13 @@ void CCredits::InputRollOutroCredits( inputdata_t &inputdata )
 
 void CCredits::InputShowLogo( inputdata_t &inputdata )
 {
-	CBasePlayer *pPlayer = UTIL_GetLocalPlayer();
-
-	CSingleUserRecipientFilter user( pPlayer );
-	user.MakeReliable();
+	CRecipientFilter filter;
+	filter.AddAllPlayers();
+	filter.MakeReliable();
 
 	if ( m_flLogoLength )
 	{
-		UserMessageBegin( user, "LogoTimeMsg" );
+		UserMessageBegin( filter, "LogoTimeMsg" );
 			WRITE_FLOAT( m_flLogoLength );
 #ifdef MAPBASE
 			WRITE_STRING( STRING(m_iszCreditsFile) );
@@ -269,7 +266,7 @@ void CCredits::InputShowLogo( inputdata_t &inputdata )
 	}
 	else
 	{
-		UserMessageBegin( user, "CreditsMsg" );
+		UserMessageBegin(filter, "CreditsMsg");
 			WRITE_BYTE( 1 );
 #ifdef MAPBASE
 			WRITE_STRING( STRING(m_iszCreditsFile) );
@@ -285,12 +282,11 @@ void CCredits::InputSetLogoLength( inputdata_t &inputdata )
 
 void CCredits::InputRollCredits( inputdata_t &inputdata )
 {
-	CBasePlayer *pPlayer = UTIL_GetLocalPlayer();
+	CRecipientFilter filter;
+	filter.AddAllPlayers();
+	filter.MakeReliable();
 
-	CSingleUserRecipientFilter user( pPlayer );
-	user.MakeReliable();
-
-	UserMessageBegin( user, "CreditsMsg" );
+	UserMessageBegin(filter, "CreditsMsg");
 		WRITE_BYTE( 2 );
 #ifdef MAPBASE
 		WRITE_STRING( STRING(m_iszCreditsFile) );

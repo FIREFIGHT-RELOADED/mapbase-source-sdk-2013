@@ -28,6 +28,8 @@ class CVGuiScreen;
 
 #define VIEWMODEL_INDEX_BITS 1
 
+//hands are 1
+#define VM_LEGS 2
 class CBaseViewModel : public CBaseAnimating, public IHasOwner
 {
 	DECLARE_CLASS( CBaseViewModel, CBaseAnimating );
@@ -53,6 +55,8 @@ public:
 	virtual void			SetWeaponModel( const char *pszModelname, CBaseCombatWeapon *weapon );
 
 	virtual void			CalcViewModelLag( Vector& origin, QAngle& angles, QAngle& original_angles );
+	void					CalcIronsights(Vector &pos, QAngle &ang);
+	void					CalcAdjustedView(Vector &pos, QAngle &ang);
 	virtual void			CalcViewModelView( CBasePlayer *owner, const Vector& eyePosition, 
 								const QAngle& eyeAngles );
 	virtual void			AddViewModelBob( CBasePlayer *owner, Vector& eyePosition, QAngle& eyeAngles ) {};

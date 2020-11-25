@@ -160,6 +160,9 @@ protected:
 	// Returns true if he started a jump (ie: should he play the jump animation)?
 	virtual bool	CheckJumpButton( void );	// Overridden by each game.
 
+	//used for double jumping
+	virtual void	AirDash(void);
+
 	// Dead player flying through air., e.g.
 	virtual void    FullTossMove( void );
 	
@@ -279,6 +282,7 @@ protected:
 	Vector			m_vecProximityMaxs;
 
 	float			m_fFrameTime;
+	int				m_1AirDashes;
 
 //private:
 	int				m_iSpeedCropped;

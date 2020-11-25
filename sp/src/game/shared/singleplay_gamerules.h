@@ -86,9 +86,13 @@ public:
 	virtual	int	GetAutoAimMode();
 
 // Client kills/scoring
+	virtual int IPointsForKillEntity( CBasePlayer *pAttacker, CBaseEntity *pKilled );
 	virtual int IPointsForKill( CBasePlayer *pAttacker, CBasePlayer *pKilled );
 	virtual void PlayerKilled( CBasePlayer *pVictim, const CTakeDamageInfo &info );
+	virtual void NPCKilled(CBaseEntity *pVictim, const CTakeDamageInfo &info);
 	virtual void DeathNotice( CBasePlayer *pVictim, const CTakeDamageInfo &info );
+	CBasePlayer *GetDeathScorer(CBaseEntity *pKiller, CBaseEntity *pInflictor);									// old version of method - kept for backward compat
+	virtual CBasePlayer *GetDeathScorer(CBaseEntity *pKiller, CBaseEntity *pInflictor, CBaseEntity *pVictim);		// new version of method
 
 // Weapon spawn/respawn control
 	virtual int WeaponShouldRespawn( CBaseCombatWeapon *pWeapon );
@@ -111,6 +115,7 @@ public:
 
 // Healthcharger respawn control
 	virtual float FlHealthChargerRechargeTime( void );
+	virtual float FlHEVChargerRechargeTime(void);
 
 // What happens to a dead player's weapons
 	virtual int DeadPlayerWeapons( CBasePlayer *pPlayer );

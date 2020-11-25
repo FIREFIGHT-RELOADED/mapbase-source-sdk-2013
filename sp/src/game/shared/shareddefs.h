@@ -121,8 +121,8 @@ public:
 
 #define WEAPON_NOCLIP			-1	// clip sizes set to this tell the weapon it doesn't use a clip
 
-#define	MAX_AMMO_TYPES	32		// ???
-#define MAX_AMMO_SLOTS  32		// not really slots
+#define	MAX_AMMO_TYPES	999		// ???
+#define MAX_AMMO_SLOTS  999		// not really slots
 
 #define HUD_PRINTNOTIFY		1
 #define HUD_PRINTCONSOLE	2
@@ -209,6 +209,7 @@ enum CastVote
 #define bits_SUIT_DEVICE_SPRINT		0x00000001
 #define bits_SUIT_DEVICE_FLASHLIGHT	0x00000002
 #define bits_SUIT_DEVICE_BREATHER	0x00000004
+#define bits_SUIT_DEVICE_BULLETTIME	0x00000005
 
 #ifdef MAPBASE
 // Custom suit power devices
@@ -217,7 +218,7 @@ enum CastVote
 #define bits_SUIT_DEVICE_CUSTOM2	0x00000020
 #endif
 
-#define MAX_SUIT_DEVICES			6		// Mapbase boosts this to 6 for the custom devices
+#define MAX_SUIT_DEVICES			7		// Mapbase boosts this to 6 for the custom devices
 
 
 //===================================================================================================================
@@ -239,7 +240,7 @@ enum CastVote
 
 #define MAX_PLACE_NAME_LENGTH		18
 
-#define MAX_FOV						90
+#define MAX_FOV						999999
 
 //===================================================================================================================
 // Team Defines
@@ -266,9 +267,11 @@ enum CastVote
 // -----------------------------------------
 // Skill Level
 // -----------------------------------------
-#define SKILL_EASY		1
-#define SKILL_MEDIUM	2
-#define SKILL_HARD		3
+#define SKILL_EASY		0
+#define SKILL_MEDIUM	1
+#define SKILL_HARD		2
+#define SKILL_VERYHARD		3
+#define SKILL_NIGHTMARE		4
 
 
 // Weapon flags
@@ -283,6 +286,7 @@ enum CastVote
 #define ITEM_FLAG_DOHITLOCATIONDMG	(1<<5)	// This weapon take hit location into account when applying damage
 #define ITEM_FLAG_NOAMMOPICKUPS		(1<<6)	// Don't draw ammo pickup sprites/sounds when ammo is received
 #define ITEM_FLAG_NOITEMPICKUP		(1<<7)	// Don't draw weapon pickup when this weapon is picked up by the player
+#define ITEM_FLAG_HIDESELECTION		(1<<8)	// Don't show weapon. -Bitl
 // NOTE: KEEP g_ItemFlags IN WEAPON_PARSE.CPP UPDATED WITH THESE
 
 
@@ -893,6 +897,67 @@ struct EmitSound_t
 	mutable CUtlVector< Vector >	m_UtlVecSoundOrigin;  ///< Actual sound origin(s) (can be multiple if sound routed through speaker entity(ies) )
 	mutable HSOUNDSCRIPTHANDLE		m_hSoundScriptHandle;
 };
+
+enum FirefightPerks
+{
+	FIREFIGHT_PERK_INFINITEAUXPOWER,
+	FIREFIGHT_PERK_INFINITEAMMO,
+	FIREFIGHT_PERK_HEALTHREGENERATIONRATE
+};
+
+enum FirefightUpgradeIDs
+{
+	FIREFIGHT_UPGRADE_MAXHEALTH
+};
+
+enum FirefightRewardIDs
+{
+	FIREFIGHT_REWARD_PERKS,
+	FIREFIGHT_REWARD_ITEM,
+	FIREFIGHT_REWARD_KASHBONUS
+};
+
+enum FirefightRewardItemIDs
+{
+	FIREFIGHT_ITEMREWARD_HEALTHKIT,
+	FIREFIGHT_ITEMREWARD_SUITBATTERY,
+	FIREFIGHT_ITEMREWARD_AMMO_357,
+	FIREFIGHT_ITEMREWARD_AMMO_AR2,
+	FIREFIGHT_ITEMREWARD_AMMO_CROSSBOW,
+	FIREFIGHT_ITEMREWARD_AMMO_PISTOL,
+	FIREFIGHT_ITEMREWARD_AMMO_SMG1,
+	FIREFIGHT_ITEMREWARD_AMMO_SHOTGUN,
+	FIREFIGHT_ITEMREWARD_AMMO_SMG1GRENADE,
+	FIREFIGHT_ITEMREWARD_AMMO_AR2BALL,
+	FIREFIGHT_ITEMREWARD_AMMO_FRAGGRENADE,
+	FIREFIGHT_ITEMREWARD_AMMO_RPGROCKET,
+	FIREFIGHT_ITEMREWARD_AMMO_SNIPERRIFLE,
+	FIREFIGHT_ITEMREWARD_AMMO_DEAGLE,
+	FIREFIGHT_ITEMREWARD_AMMO_M249PARA,
+	FIREFIGHT_ITEMREWARD_AMMO_OCIW,
+	FIREFIGHT_ITEMREWARD_AMMO_OCIWGRENADE,
+	FIREFIGHT_ITEMREWARD_AMMO_SLAM,
+	FIREFIGHT_ITEMREWARD_AMMO_FLAREGUN,
+	FIREFIGHT_ITEMREWARD_WEAPON_357,
+	FIREFIGHT_ITEMREWARD_WEAPON_AR2,
+	FIREFIGHT_ITEMREWARD_WEAPON_CROSSBOW,
+	FIREFIGHT_ITEMREWARD_WEAPON_SHOTGUN,
+	FIREFIGHT_ITEMREWARD_WEAPON_RPG,
+	FIREFIGHT_ITEMREWARD_WEAPON_SNIPERRIFLE,
+	FIREFIGHT_ITEMREWARD_WEAPON_DEAGLE,
+	FIREFIGHT_ITEMREWARD_WEAPON_M249PARA,
+	FIREFIGHT_ITEMREWARD_WEAPON_OCIW,
+	FIREFIGHT_ITEMREWARD_WEAPON_FLAREGUN,
+	FIREFIGHT_ITEMREWARD_WEAPON_GAUSS,
+	FIREFIGHT_ITEMREWARD_AMMO_GAUSS,
+	FIREFIGHT_ITEMREWARD_AMMO_MP5,
+	FIREFIGHT_ITEMREWARD_BIGHEALTHKIT,
+	FIREFIGHT_ITEMREWARD_BIGSUITBATTERY
+};
+
+//fr defs
+#define MAX_LEVEL 50
+#define MAX_EXP 60
 
 #define MAX_ACTORS_IN_SCENE 16
 

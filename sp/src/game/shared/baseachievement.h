@@ -200,6 +200,28 @@ class CMapAchievement : public CBaseAchievement
 	}
 };
 
+class CFailableAchievementNoEvent : public CBaseAchievement
+{
+	DECLARE_CLASS(CFailableAchievementNoEvent, CBaseAchievement);
+public:
+	CFailableAchievementNoEvent();
+	void SetFailed();
+
+	virtual bool ShouldSaveWithGame();
+	virtual void PreRestoreSavedGame();
+	virtual bool IsAchieved() { return !m_bFailed && BaseClass::IsAchieved(); }
+	bool IsFailed() { return m_bFailed; }
+
+	virtual void CheckIncrementCount();
+
+protected:
+
+	bool	m_bFailed;			// has this achievement failed
+
+public:
+	DECLARE_DATADESC();
+};
+
 
 //----------------------------------------------------------------------------------------------------------------
 class CAchievement_AchievedCount : public CBaseAchievement

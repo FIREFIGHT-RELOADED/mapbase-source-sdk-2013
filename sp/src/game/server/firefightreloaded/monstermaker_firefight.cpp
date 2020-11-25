@@ -150,6 +150,8 @@ CNPCMakerFirefight::CNPCMakerFirefight(void)
 //-----------------------------------------------------------------------------
 void CNPCMakerFirefight::Spawn(void)
 {
+	ScriptInstallPreSpawnHook();
+	
 	SetSolid( SOLID_NONE );
 	m_nLiveChildren		= 0;
 	m_nLiveRareNPCs		= 0;
@@ -527,6 +529,7 @@ void CNPCMakerFirefight::MakeNPC(bool rareNPC)
 		ChildPostSpawn(pent);
 		//rare entities have their own value we must consider.
 		m_nLiveRareNPCs++;
+		ScriptPostSpawn( &m_ScriptScope, &pent, 1 );
 	}
 	else
 	{
@@ -623,6 +626,7 @@ void CNPCMakerFirefight::MakeNPC(bool rareNPC)
 		}
 
 		ChildPostSpawn(pent);
+		ScriptPostSpawn( &m_ScriptScope, &pent, 1 );
 	}
 
 	m_nLiveChildren++;// count this NPC

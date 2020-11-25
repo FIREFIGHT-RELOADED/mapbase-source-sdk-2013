@@ -85,6 +85,7 @@ public:
 	char					szViewModel[MAX_WEAPON_STRING];			// View model of this weapon
 	char					szWorldModel[MAX_WEAPON_STRING];		// Model of this weapon seen carried by the player
 	char					szAnimationPrefix[MAX_WEAPON_PREFIX];	// Prefix of the animations that should be used by the player carrying this weapon
+	char					szWeaponType[MAX_WEAPON_STRING];	// Defines the weapon's "type"
 	int						iSlot;									// inventory slot.
 	int						iPosition;								// position in the inventory slot.
 	int						iMaxClip1;								// max primary clip size (-1 if no clip)
@@ -98,6 +99,122 @@ public:
 	int						iFlags;									// miscellaneous weapon flags
 	char					szAmmo1[MAX_WEAPON_AMMO_NAME];			// "primary" ammo type
 	char					szAmmo2[MAX_WEAPON_AMMO_NAME];			// "secondary" ammo type
+
+	Vector					vecIronsightPosOffset;
+	QAngle					angIronsightAngOffset;
+	float					flIronsightFOVOffset;
+	Vector					vecAdjustPosOffset;
+	QAngle					angAdjustAngOffset;
+	bool					m_bUseIronsight;
+	bool					m_bUseMagStyleReloads;
+	bool					m_bUseMuzzleSmoke;
+	bool					m_bLowerWeapon;
+	bool					m_bUseIronsightCrosshair;
+
+	//SMMOD Custom Weapons!
+	//bool	m_sUsesShotgunStyleReloads;
+	bool	m_sCanReloadSingly;
+	bool	m_sDualWeapons;
+	bool	m_sWeaponOptions;
+	bool	m_sCustomMelee;
+	bool	m_sCustomMeleeSecondary;
+
+	bool	m_sPrimaryBulletEnabled;
+	bool	m_sPrimaryMissleEnabled;
+	char	m_sPrimaryAmmoType;
+	float	m_sPrimaryDamage;
+	int m_sPrimaryShotCount;
+	float m_sPrimaryFireRate;
+	Vector m_vPrimarySpread;
+	bool	m_sPrimaryInfiniteAmmoEnabled;
+	bool	m_sPrimarySMGGrenadeEnabled;
+	float	m_sSMGGrenadePrimaryDamage;
+	bool	m_sPrimaryAR2EnergyBallEnabled;
+	float	m_sPrimaryCombineBallRadius;
+	float	m_sPrimaryCombineBallMass;
+	float	m_sPrimaryCombineBallDuration;
+	float	m_sPrimaryRecoilEasyDampen;
+	float	m_sPrimaryRecoilDegrees;
+	float	m_sPrimaryRecoilSeconds;
+	Vector	m_vPrimaryIronsightSpread;
+	Vector	m_vPrimaryZoomSpread;
+	float	m_sPrimaryIronsightFireRate;
+	float	m_sPrimaryZoomFireRate;
+	bool	m_sHasPrimaryFire;
+	bool	m_sPrimaryHasRecoilSMGGrenade;
+	bool	m_sPrimaryHasRecoilRPGMissle;
+	int		m_sPrimaryMinRange;
+	int		m_sPrimaryMaxRange;
+	bool	m_sCanPrimaryFireUnderwater;
+	bool	m_sFireBothOnPrimary;
+	//float	m_sPrimaryMeleeDamage;
+
+	bool	m_sSecondaryBulletEnabled;
+	bool	m_sSecondaryMissleEnabled;
+	bool	 m_sUsePrimaryAmmo;
+	char	m_sSecondaryAmmoType;
+	float	m_sSecondaryDamage;
+	int m_sSecondaryShotCount;
+	float m_sSecondaryFireRate;
+	Vector m_vSecondarySpread;
+	bool	m_sSecondaryInfiniteAmmoEnabled;
+	bool	m_sSecondarySMGGrenadeEnabled;
+	float	m_sSMGGrenadeSecondaryDamage;
+	bool	m_sSecondaryAR2EnergyBallEnabled;
+	float	m_sSecondaryCombineBallRadius;
+	float	m_sSecondaryCombineBallMass;
+	float	m_sSecondaryCombineBallDuration;
+	float	m_sSecondaryRecoilEasyDampen;
+	float	m_sSecondaryRecoilDegrees;
+	float	m_sSecondaryRecoilSeconds;
+	Vector	m_vSecondaryIronsightSpread;
+	Vector	m_vSecondaryZoomSpread;
+	float	m_sSecondaryIronsightFireRate;
+	float	m_sSecondaryZoomFireRate;
+	bool	m_sHasSecondaryFire;
+	bool	m_sSecondaryHasRecoilSMGGrenade;
+	bool	m_sSecondaryHasRecoilRPGMissle;
+	int		m_sSecondaryMinRange;
+	int		m_sSecondaryMaxRange;
+	bool	m_sCanSecondaryFireUnderwater;
+	bool	m_sFireBothOnSecondary;
+
+	bool	m_sUsesZoom;
+	bool	m_sUsesZoomSound;
+	bool	m_sUsesZoomColor;
+	bool	m_sUseZoomOnPrimaryFire;
+	int		m_sZoomColorRed;
+	int		m_sZoomColorGreen;
+	int		m_sZoomColorBlue;
+	int		m_sZoomColorAlpha;
+
+	bool	m_sHasMeleeOptions;
+	float	m_sMeleeDamage;
+	float	m_sMeleeRange;
+	float	m_sMeleeKickEasyDampen;
+	float	m_sMeleeKickDegrees;
+	float	m_sMeleeKickSeconds;
+
+	bool	m_sUsesCustomization;
+	bool	m_sUsesBodygroupSection1;
+	bool	m_sUsesBodygroupSection2;
+	bool	m_sUsesBodygroupSection3;
+	bool	m_sUsesBodygroupSection4;
+	bool	m_sUsesBodygroupSection5;
+	bool	m_sUsesBodygroupSection6;
+	int		m_sBodygroup1;
+	int		m_sBodygroup2;
+	int		m_sBodygroup3;
+	int		m_sBodygroup4;
+	int		m_sBodygroup5;
+	int		m_sBodygroup6;
+	int		m_sSubgroup1;
+	int		m_sSubgroup2;
+	int		m_sSubgroup3;
+	int		m_sSubgroup4;
+	int		m_sSubgroup5;
+	int		m_sSubgroup6;
+	int		m_sWeaponSkin;
 
 	// Sound blocks
 	char					aShootSounds[NUM_SHOOT_SOUND_TYPES][MAX_WEAPON_STRING];	
@@ -142,7 +259,7 @@ WEAPON_FILE_INFO_HANDLE LookupWeaponInfoSlot( const char *name );
 FileWeaponInfo_t *GetFileWeaponInfoFromHandle( WEAPON_FILE_INFO_HANDLE handle );
 WEAPON_FILE_INFO_HANDLE GetInvalidWeaponInfoHandle( void );
 void PrecacheFileWeaponInfoDatabase( IFileSystem *filesystem, const unsigned char *pICEKey );
-
+//void InitCustomWeapon(void);
 
 // 
 // Read a possibly-encrypted KeyValues file in. 

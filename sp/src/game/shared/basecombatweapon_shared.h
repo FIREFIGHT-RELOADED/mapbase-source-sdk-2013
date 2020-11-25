@@ -18,6 +18,7 @@
 #include "baseviewmodel_shared.h"
 #include "weapon_proficiency.h"
 #include "utlmap.h"
+#include "particle_parse.h"
 
 #if defined( CLIENT_DLL )
 #define CBaseCombatWeapon C_BaseCombatWeapon
@@ -256,12 +257,21 @@ public:
 	virtual void			DisplayReloadHudHint();
 	virtual void			RescindReloadHudHint();
 
+	virtual bool			ShouldDisplayStoreHUDHint();
+	virtual void			DisplayStoreHudHint();
+	virtual void			RescindStoreHudHint(); ///< undisplay the hud hint and pretend it never showed.
+
 	// Weapon client handling
 	virtual void			SetViewModelIndex( int index = 0 );
 	virtual bool			SendWeaponAnim( int iActivity );
 	virtual void			SendViewModelAnim( int nSequence );
 	float					GetViewModelSequenceDuration();	// Return how long the current view model sequence is.
 	bool					IsViewModelSequenceFinished( void ); // Returns if the viewmodel's current animation is finished
+
+	bool                    m_bLowered;
+	bool                    bLowered;
+	float                   m_fLowered;
+	float                   m_fLoweredReady;
 
 	virtual void			SetViewModel();
 
@@ -376,6 +386,14 @@ public:
 
 	virtual void			AddViewmodelBob( CBaseViewModel *viewmodel, Vector &origin, QAngle &angles ) {};
 	virtual float			CalcViewmodelBob( void ) { return 0.0f; };
+	virtual bool			HasIronsights(void); //default yes; override and return false for weapons with no ironsights (like weapon_crowbar)
+	virtual bool			CanIronsightUseCrosshair(void);
+	bool					IsIronsighted(void);
+	void					ToggleIronsights(void);
+	void					EnableIronsights(void);
+	void					DisableIronsights(void);
+	void					SetIronsightTime(void);
+	virtual bool			CanBeLowered(void);
 
 	// Returns information about the various control panels
 	virtual void 			GetControlPanelInfo( int nPanelIndex, const char *&pPanelName );
@@ -398,6 +416,7 @@ public:
 	virtual const char		*GetViewModel( int viewmodelindex = 0 ) const;
 	virtual const char		*GetWorldModel( void ) const;
 	virtual const char		*GetAnimPrefix( void ) const;
+	virtual const char		*GetWeaponType(void) const;
 	virtual int				GetMaxClip1( void ) const;
 	virtual int				GetMaxClip2( void ) const;
 	virtual int				GetDefaultClip1( void ) const;
@@ -414,6 +433,11 @@ public:
 	virtual int				GetRumbleEffect() const;
 	virtual bool			UsesClipsForAmmo1( void ) const;
 	virtual bool			UsesClipsForAmmo2( void ) const;
+	Vector					GetIronsightPositionOffset(void) const;
+	QAngle					GetIronsightAngleOffset(void) const;
+	float					GetIronsightFOVOffset(void) const;
+	Vector					GetAdjustPositionOffset(void) const;
+	QAngle					GetAdjustAngleOffset(void) const;
 	bool					IsMeleeWeapon() const;
 
 	// derive this function if you mod uses encrypted weapon info files
@@ -421,6 +445,8 @@ public:
 
 	virtual int				GetPrimaryAmmoType( void )  const { return m_iPrimaryAmmoType; }
 	virtual int				GetSecondaryAmmoType( void )  const { return m_iSecondaryAmmoType; }
+	virtual const char				*GetPrimaryAmmoTypeName(void) const;
+	virtual const char				*GetSecondaryAmmoTypeName(void) const;
 	virtual int				Clip1() { return m_iClip1; }
 	virtual int				Clip2() { return m_iClip2; }
 
@@ -630,6 +656,7 @@ public:
 	bool					m_bInReload;			// Are we in the middle of a reload;
 	bool					m_bFireOnEmpty;			// True when the gun is empty and the player is still holding down the attack key(s)
 	bool					m_bFiringWholeClip;		// Are we in the middle of firing the whole clip;
+	bool					m_bHolstering;			// Are we holstering;
 	// Weapon art
 	CNetworkVar( int, m_iViewModelIndex );
 	CNetworkVar( int, m_iWorldModelIndex );
@@ -665,6 +692,7 @@ public:
 	CNetworkVar( int, m_iSecondaryAmmoType );	// "secondary" ammo index into the ammo info array
 	CNetworkVar( int, m_iClip1 );				// number of shots left in the primary weapon clip, -1 it not used
 	CNetworkVar( int, m_iClip2 );				// number of shots left in the secondary weapon clip, -1 it not used
+	bool					m_bMagazineStyleReloads;	// true if this weapon reloads by removing magazines (remaining bullets)
 	bool					m_bFiresUnderwater;		// true if this weapon can fire underwater
 	bool					m_bAltFiresUnderwater;		// true if this weapon can fire underwater
 	float					m_fMinRange1;			// What's the closest this weapon can be used?
@@ -672,6 +700,8 @@ public:
 	float					m_fMaxRange1;			// What's the furthest this weapon can be used?
 	float					m_fMaxRange2;			// What's the furthest this weapon can be used?
 	bool					m_bReloadsSingly;		// True if this weapon reloads 1 round at a time
+	CNetworkVar(bool, m_bIsIronsighted);
+	CNetworkVar(float, m_flIronsightedTime);
 	float					m_fFireDuration;		// The amount of time that the weapon has sustained firing
 	int						m_iSubType;
 
@@ -700,8 +730,10 @@ private:
 
 	int						m_iAltFireHudHintCount;		// How many times has this weapon displayed its alt-fire HUD hint?
 	int						m_iReloadHudHintCount;		// How many times has this weapon displayed its reload HUD hint?
+	int						m_iStoreHudHintCount;		// How many times has this weapon displayed its store HUD hint?
 	bool					m_bAltFireHudHintDisplayed;	// Have we displayed an alt-fire HUD hint since this weapon was deployed?
 	bool					m_bReloadHudHintDisplayed;	// Have we displayed a reload HUD hint since this weapon was deployed?
+	bool					m_bStoreHudHintDisplayed;	// Have we displayed a store HUD hint since this weapon was deployed?
 	float					m_flHudHintPollTime;	// When to poll the weapon again for whether it should display a hud hint.
 	float					m_flHudHintMinDisplayTime; // if the hint is squelched before this, reset my counter so we'll display it again.
 	

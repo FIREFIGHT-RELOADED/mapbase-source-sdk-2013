@@ -103,14 +103,14 @@ enum Class_T
 	CLASS_ANTLION,
 	CLASS_BARNACLE,
 	CLASS_BULLSEYE,
-	//CLASS_BULLSQUID,	
+	CLASS_BULLSQUID,	
 	CLASS_CITIZEN_PASSIVE,	
 	CLASS_CITIZEN_REBEL,
 	CLASS_COMBINE,
 	CLASS_COMBINE_GUNSHIP,
 	CLASS_CONSCRIPT,
 	CLASS_HEADCRAB,
-	//CLASS_HOUNDEYE,
+	CLASS_HOUNDEYE,
 	CLASS_MANHACK,
 	CLASS_METROPOLICE,		
 	CLASS_MILITARY,		
@@ -124,6 +124,9 @@ enum Class_T
 	CLASS_EARTH_FAUNA,
 	CLASS_HACKED_ROLLERMINE,
 	CLASS_COMBINE_HUNTER,
+	CLASS_ALIEN_MILITARY,
+	CLASS_COMBINE_CREMATOR,
+	CLASS_PLAYER_NPC,
 
 	NUM_AI_CLASSES
 };
@@ -160,14 +163,14 @@ enum Class_T
 	CLASS_ANTLION,
 	CLASS_BARNACLE,
 	CLASS_BULLSEYE,
-	//CLASS_BULLSQUID,	
+	CLASS_BULLSQUID,	
 	CLASS_CITIZEN_PASSIVE,	
 	CLASS_CITIZEN_REBEL,
 	CLASS_COMBINE,
 	CLASS_COMBINE_GUNSHIP,
 	CLASS_CONSCRIPT,
 	CLASS_HEADCRAB,
-	//CLASS_HOUNDEYE,
+	CLASS_HOUNDEYE,
 	CLASS_MANHACK,
 	CLASS_METROPOLICE,		
 	CLASS_MILITARY,		
@@ -1227,9 +1230,13 @@ public:
 	// Health accessors.
 	virtual int		GetMaxHealth()  const	{ return m_iMaxHealth; }
 	void	SetMaxHealth( int amt )	{ m_iMaxHealth = amt; }
+	void	AddMaxHealth(int amt)	{ m_iMaxHealth += amt; }
+	void	RemoveMaxHealth(int amt)	{ m_iMaxHealth -= amt; }
 
 	int		GetHealth() const		{ return m_iHealth; }
 	void	SetHealth( int amt )	{ m_iHealth = amt; }
+	void	AddHealth(int amt)		{ m_iHealth += amt; }
+	void	RemoveHealth(int amt)		{ m_iHealth -= amt; }
 
 	// Ugly code to lookup all functions to make sure they are in the table when set.
 #ifdef _DEBUG
@@ -1900,6 +1907,8 @@ public:
 	// So it can get at the physics methods
 	friend class CCollisionEvent;
 
+	bool m_isRareEntity;
+
 // Methods shared by client and server
 public:
 	void							SetSize( const Vector &vecMin, const Vector &vecMax ); // UTIL_SetSize( this, mins, maxs );
@@ -2084,6 +2093,9 @@ public:
 
 	int ScriptGetMoveType() { return GetMoveType(); }
 	void ScriptSetMoveType( int iMoveType ) { SetMoveType( (MoveType_t)iMoveType ); }
+	
+	bool ScriptIsRareEnemy() {return m_isRareEntity;}
+	void ScriptSetRareEnemy(bool iSetRare) {m_isRareEntity = iSetRare;}
 #endif
 
 	string_t		m_iszVScripts;

@@ -127,7 +127,8 @@ void CBaseViewModel::SpawnControlPanels()
 	// Destroy existing panels
 	DestroyControlPanels();
 
-	CBaseCombatWeapon *weapon = m_hWeapon.Get();
+	//CBaseCombatWeapon *weapon = m_hWeapon.Get();
+	CBaseCombatWeapon *weapon = GetOwningWeapon();
 
 	if ( weapon == NULL )
 	{
@@ -368,7 +369,8 @@ void CBaseViewModel::SendViewModelMatchingSequence( int sequence )
 	// Force frame interpolation to start at exactly frame zero
 	m_flAnimTime			= gpGlobals->curtime;
 #else
-	CBaseCombatWeapon *weapon = m_hWeapon.Get();
+	//CBaseCombatWeapon *weapon = m_hWeapon.Get();
+	CBaseCombatWeapon *weapon = GetOwningWeapon();
 	bool showControlPanels = weapon && weapon->ShouldShowControlPanels();
 	SetControlPanelsActive( showControlPanels );
 #endif
@@ -382,6 +384,57 @@ void CBaseViewModel::SendViewModelMatchingSequence( int sequence )
 #include "ivieweffects.h"
 #endif
 
+void CBaseViewModel::CalcIronsights(Vector &pos, QAngle &ang)
+{
+	CBaseCombatWeapon *pWeapon = GetOwningWeapon();
+
+	if (!pWeapon)
+		return;
+
+	//get delta time for interpolation
+	float delta = (gpGlobals->curtime - pWeapon->m_flIronsightedTime) * 6.5f; //modify this value to adjust how fast the interpolation is
+	float exp = (pWeapon->IsIronsighted()) ?
+		(delta > 1.0f) ? 1.0f : delta : //normal blending
+		(delta > 1.0f) ? 0.0f : 1.0f - delta; //reverse interpolation
+
+	if (exp <= 0.001f) //fully not ironsighted; save performance
+		return;
+
+	Vector newPos = pos;
+	QAngle newAng = ang;
+
+	Vector vForward, vRight, vUp, vOffset;
+	AngleVectors(newAng, &vForward, &vRight, &vUp);
+	vOffset = pWeapon->GetIronsightPositionOffset();
+
+	newPos += vForward * vOffset.x;
+	newPos += vRight * vOffset.y;
+	newPos += vUp * vOffset.z;
+	newAng += pWeapon->GetIronsightAngleOffset();
+	//fov is handled by CBaseCombatWeapon
+
+	pos += (newPos - pos) * exp;
+	ang += (newAng - ang) * exp;
+}
+
+void CBaseViewModel::CalcAdjustedView(Vector &pos, QAngle &ang)
+{
+	CBaseCombatWeapon *pWeapon = GetOwningWeapon();
+
+	if (!pWeapon)
+		return;
+
+	Vector vForward, vRight, vUp, vOffset;
+	AngleVectors(ang, &vForward, &vRight, &vUp);
+	vOffset = pWeapon->GetAdjustPositionOffset();
+
+	pos += vForward * vOffset.x;
+	pos += vRight * vOffset.y;
+	pos += vUp * vOffset.z;
+	ang += pWeapon->GetAdjustAngleOffset();
+	//fov is handled by CBaseCombatWeapon
+}
+
 void CBaseViewModel::CalcViewModelView( CBasePlayer *owner, const Vector& eyePosition, const QAngle& eyeAngles )
 {
 	// UNDONE: Calc this on the server?  Disabled for now as it seems unnecessary to have this info on the server
@@ -390,7 +443,9 @@ void CBaseViewModel::CalcViewModelView( CBasePlayer *owner, const Vector& eyePos
 	QAngle vmangles = eyeAngles;
 	Vector vmorigin = eyePosition;
 
-	CBaseCombatWeapon *pWeapon = m_hWeapon.Get();
+	
+	//CBaseCombatWeapon *pWeapon = m_hWeapon.Get();
+	CBaseCombatWeapon *pWeapon = GetOwningWeapon();
 	//Allow weapon lagging
 	if ( pWeapon != NULL )
 	{
@@ -400,13 +455,18 @@ void CBaseViewModel::CalcViewModelView( CBasePlayer *owner, const Vector& eyePos
 		{
 			// add weapon-specific bob 
 			pWeapon->AddViewmodelBob( this, vmorigin, vmangles );
-#if defined ( CSTRIKE_DLL )
-			CalcViewModelLag( vmorigin, vmangles, vmangoriginal );
-#endif
+//#if defined ( CSTRIKE_DLL )
+			//CalcViewModelLag( vmorigin, vmangles, vmangoriginal );
+//#endif
 		}
 	}
 	// Add model-specific bob even if no weapon associated (for head bob for off hand models)
 	AddViewModelBob( owner, vmorigin, vmangles );
+//#if !defined ( CSTRIKE_DLL )
+	// This was causing weapon jitter when rotating in updated CS:S; original Source had this in above InPrediction block  07/14/10
+	// Add lag
+	//CalcViewModelLag(vmorigin, vmangles, vmangoriginal);
+//#endif
 
 #if defined( CLIENT_DLL )
 	if ( !prediction->InPrediction() )
@@ -424,6 +484,9 @@ void CBaseViewModel::CalcViewModelView( CBasePlayer *owner, const Vector& eyePos
 		g_ClientVirtualReality.OverrideViewModelTransform( vmorigin, vmangles, pWeapon && pWeapon->ShouldUseLargeViewModelVROverride() );
 	}
 
+	CalcIronsights(vmorigin, vmangles);
+	CalcAdjustedView(vmorigin, vmangles);
+
 	SetLocalOrigin( vmorigin );
 	SetLocalAngles( vmangles );
 
@@ -432,7 +495,7 @@ void CBaseViewModel::CalcViewModelView( CBasePlayer *owner, const Vector& eyePos
 	{
 		const float max_gun_pitch = 20.0f;
 
-		float viewmodel_fov_ratio = g_pClientMode->GetViewModelFOV()/owner->GetFOV();
+		float viewmodel_fov_ratio = g_pClientMode->GetViewModelFOV();
 		QAngle gun_angles = g_pSixenseInput->GetViewAngleOffset() * -viewmodel_fov_ratio;
 
 		// Clamp pitch a bit to minimize seeing back of viewmodel
@@ -636,8 +699,10 @@ void RecvProxy_SequenceNum( const CRecvProxyData *pData, void *pStruct, void *pO
 //-----------------------------------------------------------------------------
 int	CBaseViewModel::LookupAttachment( const char *pAttachmentName )
 {
-	if ( m_hWeapon.Get() && m_hWeapon.Get()->WantsToOverrideViewmodelAttachments() )
-		return m_hWeapon.Get()->LookupAttachment( pAttachmentName );
+	//if (m_hWeapon.Get() && m_hWeapon.Get()->WantsToOverrideViewmodelAttachments())
+	//	return m_hWeapon.Get()->LookupAttachment(pAttachmentName);
+	if (GetOwningWeapon() && GetOwningWeapon()->WantsToOverrideViewmodelAttachments())
+		return GetOwningWeapon()->LookupAttachment(pAttachmentName);
 
 	return BaseClass::LookupAttachment( pAttachmentName );
 }
@@ -647,8 +712,10 @@ int	CBaseViewModel::LookupAttachment( const char *pAttachmentName )
 //-----------------------------------------------------------------------------
 bool CBaseViewModel::GetAttachment( int number, matrix3x4_t &matrix )
 {
-	if ( m_hWeapon.Get() && m_hWeapon.Get()->WantsToOverrideViewmodelAttachments() )
-		return m_hWeapon.Get()->GetAttachment( number, matrix );
+	//if (m_hWeapon.Get() && m_hWeapon.Get()->WantsToOverrideViewmodelAttachments())
+	//	return m_hWeapon.Get()->GetAttachment(number, matrix);
+	if (GetOwningWeapon() && GetOwningWeapon()->WantsToOverrideViewmodelAttachments())
+		return GetOwningWeapon()->GetAttachment(number, matrix);
 
 	return BaseClass::GetAttachment( number, matrix );
 }
@@ -658,8 +725,10 @@ bool CBaseViewModel::GetAttachment( int number, matrix3x4_t &matrix )
 //-----------------------------------------------------------------------------
 bool CBaseViewModel::GetAttachment( int number, Vector &origin )
 {
-	if ( m_hWeapon.Get() && m_hWeapon.Get()->WantsToOverrideViewmodelAttachments() )
-		return m_hWeapon.Get()->GetAttachment( number, origin );
+	//if ( m_hWeapon.Get() && m_hWeapon.Get()->WantsToOverrideViewmodelAttachments() )
+	//	return m_hWeapon.Get()->GetAttachment( number, origin );
+	if (GetOwningWeapon() && GetOwningWeapon()->WantsToOverrideViewmodelAttachments())
+		return GetOwningWeapon()->GetAttachment(number, origin);
 
 	return BaseClass::GetAttachment( number, origin );
 }
@@ -669,8 +738,10 @@ bool CBaseViewModel::GetAttachment( int number, Vector &origin )
 //-----------------------------------------------------------------------------
 bool CBaseViewModel::GetAttachment( int number, Vector &origin, QAngle &angles )
 {
-	if ( m_hWeapon.Get() && m_hWeapon.Get()->WantsToOverrideViewmodelAttachments() )
-		return m_hWeapon.Get()->GetAttachment( number, origin, angles );
+	//if ( m_hWeapon.Get() && m_hWeapon.Get()->WantsToOverrideViewmodelAttachments() )
+	//	return m_hWeapon.Get()->GetAttachment( number, origin, angles );
+	if (GetOwningWeapon() && GetOwningWeapon()->WantsToOverrideViewmodelAttachments())
+		return GetOwningWeapon()->GetAttachment(number, origin, angles);
 
 	return BaseClass::GetAttachment( number, origin, angles );
 }
@@ -680,8 +751,10 @@ bool CBaseViewModel::GetAttachment( int number, Vector &origin, QAngle &angles )
 //-----------------------------------------------------------------------------
 bool CBaseViewModel::GetAttachmentVelocity( int number, Vector &originVel, Quaternion &angleVel )
 {
-	if ( m_hWeapon.Get() && m_hWeapon.Get()->WantsToOverrideViewmodelAttachments() )
-		return m_hWeapon.Get()->GetAttachmentVelocity( number, originVel, angleVel );
+	//if ( m_hWeapon.Get() && m_hWeapon.Get()->WantsToOverrideViewmodelAttachments() )
+	//	return m_hWeapon.Get()->GetAttachmentVelocity( number, originVel, angleVel );
+	if (GetOwningWeapon() && GetOwningWeapon()->WantsToOverrideViewmodelAttachments())
+		return GetOwningWeapon()->GetAttachmentVelocity(number, originVel, angleVel);
 
 	return BaseClass::GetAttachmentVelocity( number, originVel, angleVel );
 }

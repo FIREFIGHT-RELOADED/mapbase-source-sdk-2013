@@ -18,6 +18,12 @@ extern ConVar	displaysoundlist;
 extern ConVar	mapcyclefile;
 extern ConVar	servercfgfile;
 extern ConVar	lservercfgfile;
+extern ConVar	combinefirefightcfgfile;
+extern ConVar	xeninvasioncfgfile;
+extern ConVar	antlionassaultcfgfile;
+extern ConVar	zombiesurvivalcfgfile;
+extern ConVar	firefightrumblecfgfile;
+extern ConVar	resistanceretributioncfgfile;
 
 // multiplayer server rules
 extern ConVar	teamplay;

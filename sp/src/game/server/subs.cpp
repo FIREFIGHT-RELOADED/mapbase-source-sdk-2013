@@ -43,6 +43,7 @@ LINK_ENTITY_TO_CLASS(info_null,CNullEntity);
 LINK_ENTITY_TO_CLASS(func_null,CNullEntity);
 #endif
 
+/*
 class CBaseDMStart : public CPointEntity
 {
 public:
@@ -62,19 +63,28 @@ BEGIN_DATADESC( CBaseDMStart )
 	DEFINE_KEYFIELD( m_Master, FIELD_STRING, "master" ),
 
 END_DATADESC()
+*/
 
 
 // These are the new entry points to entities. 
-LINK_ENTITY_TO_CLASS(info_player_deathmatch,CBaseDMStart);
+LINK_ENTITY_TO_CLASS(info_player_deathmatch, CPointEntity);
 LINK_ENTITY_TO_CLASS(info_player_start,CPointEntity);
+LINK_ENTITY_TO_CLASS(info_player_combine, CPointEntity);
+LINK_ENTITY_TO_CLASS(info_player_rebel, CPointEntity);
+LINK_ENTITY_TO_CLASS(info_player_allies, CPointEntity);
+LINK_ENTITY_TO_CLASS(info_player_axis, CPointEntity);
+LINK_ENTITY_TO_CLASS(info_player_terrorist, CPointEntity);
+LINK_ENTITY_TO_CLASS(info_player_counterterrorist, CPointEntity);
 LINK_ENTITY_TO_CLASS(info_landmark,CPointEntity);
 
+/*
 bool CBaseDMStart::IsTriggered( CBaseEntity *pEntity )
 {
 	bool master = UTIL_IsMasterTriggered( m_Master, pEntity );
 
 	return master;
 }
+*/
 
 
 // Convenient way to delay removing oneself

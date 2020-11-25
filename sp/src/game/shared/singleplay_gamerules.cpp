@@ -6,6 +6,7 @@
 
 #include "cbase.h"
 #include "singleplay_gamerules.h"
+#include "fmtstr.h"
 
 #ifdef CLIENT_DLL
 
@@ -16,19 +17,50 @@
 	#include "gamerules.h"
 	#include "game.h"
 	#include "items.h"
+	#include "SMMOD/mapadd.h"
+	#include "iscorer.h"
 
 #endif
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
+ConVar sk_money_multiplier1("sk_money_multiplier1", "4");
+ConVar sk_money_multiplier2("sk_money_multiplier2", "4");
+ConVar sk_money_multiplier3("sk_money_multiplier3", "3");
+ConVar sk_money_multiplier4("sk_money_multiplier4", "2");
+ConVar sk_money_multiplier5("sk_money_multiplier5", "1");
 
+ConVar sk_exp_multiplier1("sk_exp_multiplier1", "4");
+ConVar sk_exp_multiplier2("sk_exp_multiplier2", "4");
+ConVar sk_exp_multiplier3("sk_exp_multiplier3", "3");
+ConVar sk_exp_multiplier4("sk_exp_multiplier4", "2");
+ConVar sk_exp_multiplier5("sk_exp_multiplier5", "1");
+
+ConVar sv_killingspree("sv_killingspree", "1", FCVAR_ARCHIVE);
+
+ConVar sv_healthcharger_recharge("sv_healthcharger_recharge", "1", FCVAR_ARCHIVE);
+ConVar sv_healthcharger_recharge_time("sv_healthcharger_recharge_time", "180", FCVAR_CHEAT);
+ConVar sv_suitcharger_recharge("sv_suitcharger_recharge", "1", FCVAR_ARCHIVE);
+ConVar sv_suitcharger_recharge_time("sv_suitcharger_recharge_time", "180", FCVAR_CHEAT);
+ConVar sv_item_respawn("sv_item_respawn", "1", FCVAR_ARCHIVE);
+ConVar sv_item_respawn_time("sv_item_respawn_time", "180", FCVAR_CHEAT);
+ConVar sv_weapon_respawn("sv_weapon_respawn", "1", FCVAR_ARCHIVE);
+ConVar sv_weapon_respawn_time("sv_weapon_respawn_time", "180", FCVAR_CHEAT);
+
+ConVar sv_player_dropweaponsondeath("sv_player_dropweaponsondeath", "1", FCVAR_ARCHIVE);
+
+ConVar sv_mp_pvp("sv_mp_pvp", "0", FCVAR_NOTIFY);
+
+extern ConVar sv_player_voice;
+extern ConVar sv_player_voice_kill_freq;
+extern ConVar sv_player_voice_kill;
 
 //=========================================================
 //=========================================================
 bool CSingleplayRules::IsMultiplayer( void )
 {
-	return false;
+	return gpGlobals->maxClients > 1;
 }
 
 // Needed during the conversion, but once DMG_* types have been fixed, this isn't used anymore.
@@ -147,6 +179,31 @@ bool CSingleplayRules::Damage_ShouldNotBleed( int iDmgType )
 	CSingleplayRules::CSingleplayRules( void )
 	{
 		RefreshSkillData( true );
+
+		char mapcfg[256];
+		Q_snprintf(mapcfg, sizeof(mapcfg), "cfg/%s.cfg", STRING(gpGlobals->mapname));
+
+		Q_FixSlashes(mapcfg);
+		Q_strlower(mapcfg);
+
+		if (mapcfg)
+		{
+			char szCommandMap[256];
+
+			Log("Executing map config file %s\n", mapcfg);
+			Q_snprintf(szCommandMap, sizeof(szCommandMap), "exec %s\n", mapcfg);
+			engine->ServerCommand(szCommandMap);
+		}
+
+		char mapname[256];
+#if !defined( CLIENT_DLL )
+		Q_snprintf(mapname, sizeof(mapname), "maps/%s", STRING(gpGlobals->mapname));
+#else
+		Q_strncpy(mapname, engine->GetLevelName(), sizeof(mapname));
+#endif
+
+		Q_FixSlashes(mapname);
+		Q_strlower(mapname);
 	}
 
 	//=========================================================
@@ -160,14 +217,14 @@ bool CSingleplayRules::Damage_ShouldNotBleed( int iDmgType )
 	//=========================================================
 	bool CSingleplayRules::IsDeathmatch ( void )
 	{
-		return false;
+		return sv_mp_pvp.GetBool();
 	}
 
 	//=========================================================
 	//=========================================================
 	bool CSingleplayRules::IsCoOp( void )
 	{
-		return false;
+		return gpGlobals->maxClients > 1;
 	}
 
 	//-----------------------------------------------------------------------------
@@ -286,8 +343,9 @@ bool CSingleplayRules::Damage_ShouldNotBleed( int iDmgType )
 	{
 		// subtract off the speed at which a player is allowed to fall without being hurt,
 		// so damage will be based on speed beyond that, not the entire fall
-		pPlayer->m_Local.m_flFallVelocity -= PLAYER_MAX_SAFE_FALL_SPEED;
-		return pPlayer->m_Local.m_flFallVelocity * DAMAGE_FOR_FALL_SPEED;
+		//pPlayer->m_Local.m_flFallVelocity -= PLAYER_MAX_SAFE_FALL_SPEED;
+		//return pPlayer->m_Local.m_flFallVelocity * DAMAGE_FOR_FALL_SPEED;
+		return 0;
 	}
 
 	//=========================================================
@@ -343,11 +401,543 @@ bool CSingleplayRules::Damage_ShouldNotBleed( int iDmgType )
 		return 1;
 	}
 
+	int CSingleplayRules::IPointsForKillEntity(CBasePlayer *pAttacker, CBaseEntity *pKilled)
+	{
+		return 1;
+	}
+	
+	//-----------------------------------------------------------------------------
+	// Purpose: 
+	//-----------------------------------------------------------------------------
+	CBasePlayer *CSingleplayRules::GetDeathScorer( CBaseEntity *pKiller, CBaseEntity *pInflictor )
+	{
+		if ( pKiller)
+		{
+			if ( pKiller->Classify() == CLASS_PLAYER )
+				return (CBasePlayer*)pKiller;
+
+			if (!pKiller->IsNPC())
+			{
+				// Killing entity might be specifying a scorer player
+				IScorer *pScorerInterface = dynamic_cast<IScorer*>(pKiller);
+				if (pScorerInterface)
+				{
+					CBasePlayer *pPlayer = pScorerInterface->GetScorer();
+					if (pPlayer)
+						return pPlayer;
+				}
+
+				// Inflicting entity might be specifying a scoring player
+				pScorerInterface = dynamic_cast<IScorer*>(pInflictor);
+				if (pScorerInterface)
+				{
+					CBasePlayer *pPlayer = pScorerInterface->GetScorer();
+					if (pPlayer)
+						return pPlayer;
+				}
+			}
+		}
+
+		return NULL;
+	}
+
+	//-----------------------------------------------------------------------------
+	// Purpose: Returns player who should receive credit for kill
+	//-----------------------------------------------------------------------------
+	CBasePlayer *CSingleplayRules::GetDeathScorer( CBaseEntity *pKiller, CBaseEntity *pInflictor, CBaseEntity *pVictim )
+	{
+		// if this method not overridden by subclass, just call our default implementation
+		return GetDeathScorer( pKiller, pInflictor );
+	}
+
+#define KILLING_SPREE_AMOUNT	5
+#define KILLING_FRENZY_AMOUNT	10
+#define OVERKILL_AMOUNT	15
+#define RAMPAGE_AMOUNT	20
+#define UNSTOPPABLE_AMOUNT	25
+#define INCONCEIVABLE_AMOUNT	30
+#define INVINCIBLE_AMOUNT	35
+#define GODLIKE_AMOUNT	40
+
 	//=========================================================
 	// PlayerKilled - someone/something killed this player
 	//=========================================================
 	void CSingleplayRules::PlayerKilled( CBasePlayer *pVictim, const CTakeDamageInfo &info )
 	{
+		if (sv_mp_pvp.GetBool())
+		{
+			//DeathNotice( pVictim, info );
+
+			// Find the killer & the scorer
+			CBaseEntity *pInflictor = info.GetInflictor();
+			CBaseEntity *pKiller = info.GetAttacker();
+			CBasePlayer *pScorer = GetDeathScorer(pKiller, pInflictor, pVictim);
+
+			pVictim->IncrementDeathCount(1);
+
+			// dvsents2: uncomment when removing all FireTargets
+			// variant_t value;
+			// g_EventQueue.AddEvent( "game_playerdie", "Use", value, 0, pVictim, pVictim );
+			FireTargets("game_playerdie", pVictim, pVictim, USE_TOGGLE, 0);
+
+			// Did the player kill himself?
+			if (pVictim == pScorer)
+			{
+				// Players lose a frag for letting the world kill them			
+				pVictim->IncrementFragCount(-1);
+			}
+			else if (pScorer)
+			{
+				if (!pScorer->IsNPC())
+				{
+					if (g_fr_economy.GetBool())
+					{
+						pScorer->AddMoney(10);
+					}
+					if (!g_fr_classic.GetBool())
+					{
+						pScorer->AddXP(15);
+					}
+
+					// if a player dies in a deathmatch game and the killer is a client, award the killer some points
+					pScorer->IncrementFragCount(IPointsForKill(pScorer, pVictim));
+
+					if (sv_player_voice.GetBool())
+					{
+						if (sv_player_voice_kill.GetBool())
+						{
+							int killvoicerandom = random->RandomInt(0, sv_player_voice_kill_freq.GetInt());
+							if (killvoicerandom == 0)
+							{
+								pScorer->EmitSound("Player.VoiceKill");
+							}
+						}
+					}
+
+					if (sv_killingspree.GetBool())
+					{
+						int m_iKillsInSpree = pScorer->FragCount();
+
+						if (m_iKillsInSpree == KILLING_SPREE_AMOUNT)
+						{
+							CFmtStr hint;
+							hint.sprintf("#Valve_Hud_KILLINGSPREE");
+							pScorer->ShowLevelMessage(hint.Access());
+							if (g_fr_economy.GetBool())
+							{
+								pScorer->AddMoney(2);
+							}
+							if (!g_fr_classic.GetBool())
+							{
+								pScorer->AddXP(3);
+							}
+						}
+						if (m_iKillsInSpree == KILLING_FRENZY_AMOUNT)
+						{
+							CFmtStr hint;
+							hint.sprintf("#Valve_Hud_KILLINGFRENZY");
+							pScorer->ShowLevelMessage(hint.Access());
+							if (g_fr_economy.GetBool())
+							{
+								pScorer->AddMoney(4);
+							}
+							if (!g_fr_classic.GetBool())
+							{
+								pScorer->AddXP(6);
+							}
+						}
+						if (m_iKillsInSpree == OVERKILL_AMOUNT)
+						{
+							CFmtStr hint;
+							hint.sprintf("#Valve_Hud_OVERKILL");
+							pScorer->ShowLevelMessage(hint.Access());
+							if (g_fr_economy.GetBool())
+							{
+								pScorer->AddMoney(6);
+							}
+							if (!g_fr_classic.GetBool())
+							{
+								pScorer->AddXP(9);
+							}
+						}
+						if (m_iKillsInSpree == RAMPAGE_AMOUNT)
+						{
+							CFmtStr hint;
+							hint.sprintf("#Valve_Hud_RAMPAGE");
+							pScorer->ShowLevelMessage(hint.Access());
+							if (g_fr_economy.GetBool())
+							{
+								pScorer->AddMoney(8);
+							}
+							if (!g_fr_classic.GetBool())
+							{
+								pScorer->AddXP(12);
+							}
+						}
+						if (m_iKillsInSpree == UNSTOPPABLE_AMOUNT)
+						{
+							CFmtStr hint;
+							hint.sprintf("#Valve_Hud_UNSTOPPABLE");
+							pScorer->ShowLevelMessage(hint.Access());
+							if (g_fr_economy.GetBool())
+							{
+								pScorer->AddMoney(10);
+							}
+							if (!g_fr_classic.GetBool())
+							{
+								pScorer->AddXP(15);
+							}
+						}
+						if (m_iKillsInSpree == INCONCEIVABLE_AMOUNT)
+						{
+							CFmtStr hint;
+							hint.sprintf("#Valve_Hud_INCONCEIVABLE");
+							pScorer->ShowLevelMessage(hint.Access());
+							if (g_fr_economy.GetBool())
+							{
+								pScorer->AddMoney(12);
+							}
+							if (!g_fr_classic.GetBool())
+							{
+								pScorer->AddXP(18);
+							}
+						}
+						if (m_iKillsInSpree == INVINCIBLE_AMOUNT)
+						{
+							CFmtStr hint;
+							hint.sprintf("#Valve_Hud_INVINCIBLE");
+							pScorer->ShowLevelMessage(hint.Access());
+							if (g_fr_economy.GetBool())
+							{
+								pScorer->AddMoney(14);
+							}
+							if (!g_fr_classic.GetBool())
+							{
+								pScorer->AddXP(21);
+							}
+						}
+						if (m_iKillsInSpree == GODLIKE_AMOUNT)
+						{
+							CFmtStr hint;
+							hint.sprintf("#Valve_Hud_GODLIKE");
+							pScorer->ShowLevelMessage(hint.Access());
+							if (g_fr_economy.GetBool())
+							{
+								pScorer->AddMoney(16);
+							}
+							if (!g_fr_classic.GetBool())
+							{
+								pScorer->AddXP(24);
+							}
+						}
+
+#define CLASSICLEVELUP_AMOUNT	15
+
+						if (g_fr_classic.GetBool())
+						{
+							int m_iKillsInClassicMode = 0;
+
+							m_iKillsInClassicMode++;
+
+							if (m_iKillsInClassicMode == CLASSICLEVELUP_AMOUNT)
+							{
+								pScorer->LevelUpClassic();
+								m_iKillsInClassicMode = 0;
+							}
+						}
+					}
+				}
+
+				// dvsents2: uncomment when removing all FireTargets
+				//variant_t value;
+				//g_EventQueue.AddEvent( "game_playerkill", "Use", value, 0, pScorer, pScorer );
+				FireTargets("game_playerkill", pScorer, pScorer, USE_TOGGLE, 0);
+			}
+			else
+			{
+				// Players lose a frag for letting the world kill them			
+				pVictim->IncrementFragCount(-1);
+			}
+		}
+		else
+		{
+			pVictim->IncrementDeathCount(1);
+		}
+	}
+
+	void CSingleplayRules::NPCKilled(CBaseEntity *pVictim, const CTakeDamageInfo &info)
+	{
+		// Find the killer & the scorer
+		CBaseEntity *pInflictor = info.GetInflictor();
+		CBaseEntity *pKiller = info.GetAttacker();
+		CBasePlayer *pEntity = GetDeathScorer(pKiller, pInflictor, pVictim);
+		
+		if (pEntity)
+		{
+			if (pVictim->m_isRareEntity)
+			{
+				switch (GetSkillLevel())
+				{
+				case SKILL_EASY:
+					if (g_fr_economy.GetBool())
+					{
+						pEntity->AddMoney(3 * sk_money_multiplier1.GetInt());
+					}
+					if (!g_fr_classic.GetBool())
+					{
+						pEntity->AddXP(5 * sk_exp_multiplier1.GetInt());
+					}
+					break;
+
+				case SKILL_MEDIUM:
+					if (g_fr_economy.GetBool())
+					{
+						pEntity->AddMoney(3 * sk_money_multiplier2.GetInt());
+					}
+					if (!g_fr_classic.GetBool())
+					{
+						pEntity->AddXP(5 * sk_exp_multiplier2.GetInt());
+					}
+					break;
+
+				case SKILL_HARD:
+					if (g_fr_economy.GetBool())
+					{
+						pEntity->AddMoney(3 * sk_money_multiplier3.GetInt());
+					}
+					if (!g_fr_classic.GetBool())
+					{
+						pEntity->AddXP(5 * sk_exp_multiplier3.GetInt());
+					}
+					break;
+
+				case SKILL_VERYHARD:
+					if (g_fr_economy.GetBool())
+					{
+						pEntity->AddMoney(3 * sk_money_multiplier4.GetInt());
+					}
+					if (!g_fr_classic.GetBool())
+					{
+						pEntity->AddXP(5 * sk_exp_multiplier4.GetInt());
+					}
+					break;
+
+				case SKILL_NIGHTMARE:
+					if (g_fr_economy.GetBool())
+					{
+						pEntity->AddMoney(3 * sk_money_multiplier5.GetInt());
+					}
+					if (!g_fr_classic.GetBool())
+					{
+						pEntity->AddXP(5 * sk_exp_multiplier5.GetInt());
+					}
+					break;
+				}
+			}
+			else
+			{
+				switch (GetSkillLevel())
+				{
+				case SKILL_EASY:
+					if (g_fr_economy.GetBool())
+					{
+						pEntity->AddMoney(2 * sk_money_multiplier1.GetInt());
+					}
+					if (!g_fr_classic.GetBool())
+					{
+						pEntity->AddXP(3 * sk_exp_multiplier1.GetInt());
+					}
+					break;
+
+				case SKILL_MEDIUM:
+					if (g_fr_economy.GetBool())
+					{
+						pEntity->AddMoney(2 * sk_money_multiplier2.GetInt());
+					}
+					if (!g_fr_classic.GetBool())
+					{
+						pEntity->AddXP(3 * sk_exp_multiplier2.GetInt());
+					}
+					break;
+
+				case SKILL_HARD:
+					if (g_fr_economy.GetBool())
+					{
+						pEntity->AddMoney(2 * sk_money_multiplier3.GetInt());
+					}
+					if (!g_fr_classic.GetBool())
+					{
+						pEntity->AddXP(3 * sk_exp_multiplier3.GetInt());
+					}
+					break;
+
+				case SKILL_VERYHARD:
+					if (g_fr_economy.GetBool())
+					{
+						pEntity->AddMoney(2 * sk_money_multiplier4.GetInt());
+					}
+					if (!g_fr_classic.GetBool())
+					{
+						pEntity->AddXP(3 * sk_exp_multiplier4.GetInt());
+					}
+					break;
+
+				case SKILL_NIGHTMARE:
+					if (g_fr_economy.GetBool())
+					{
+						pEntity->AddMoney(2 * sk_money_multiplier5.GetInt());
+					}
+					if (!g_fr_classic.GetBool())
+					{
+						pEntity->AddXP(3 * sk_exp_multiplier5.GetInt());
+					}
+					break;
+				}
+			}
+
+			pEntity->IncrementFragCount(IPointsForKillEntity(pEntity, pVictim));
+
+			if (info.GetInflictor() == pEntity)
+			{
+				if (sv_player_voice.GetBool())
+				{
+					if (sv_player_voice_kill.GetBool())
+					{
+						int killvoicerandom = random->RandomInt(0, sv_player_voice_kill_freq.GetInt());
+						if (killvoicerandom == 0)
+						{
+							pEntity->EmitSound("Player.VoiceKill");
+						}
+					}
+				}
+			}
+
+			if (sv_killingspree.GetBool())
+			{
+				int m_iKillsInSpree = pEntity->FragCount();
+
+				if (m_iKillsInSpree == KILLING_SPREE_AMOUNT)
+				{
+					CFmtStr hint;
+					hint.sprintf("#Valve_Hud_KILLINGSPREE");
+					pEntity->ShowLevelMessage(hint.Access());
+					if (g_fr_economy.GetBool())
+					{
+						pEntity->AddMoney(2);
+					}
+					if (!g_fr_classic.GetBool())
+					{
+						pEntity->AddXP(3);
+					}
+				}
+				if (m_iKillsInSpree == KILLING_FRENZY_AMOUNT)
+				{
+					CFmtStr hint;
+					hint.sprintf("#Valve_Hud_KILLINGFRENZY");
+					pEntity->ShowLevelMessage(hint.Access());
+					if (g_fr_economy.GetBool())
+					{
+						pEntity->AddMoney(4);
+					}
+					if (!g_fr_classic.GetBool())
+					{
+						pEntity->AddXP(6);
+					}
+				}
+				if (m_iKillsInSpree == OVERKILL_AMOUNT)
+				{
+					CFmtStr hint;
+					hint.sprintf("#Valve_Hud_OVERKILL");
+					pEntity->ShowLevelMessage(hint.Access());
+					if (g_fr_economy.GetBool())
+					{
+						pEntity->AddMoney(6);
+					}
+					if (!g_fr_classic.GetBool())
+					{
+						pEntity->AddXP(9);
+					}
+				}
+				if (m_iKillsInSpree == RAMPAGE_AMOUNT)
+				{
+					CFmtStr hint;
+					hint.sprintf("#Valve_Hud_RAMPAGE");
+					pEntity->ShowLevelMessage(hint.Access());
+					if (g_fr_economy.GetBool())
+					{
+						pEntity->AddMoney(8);
+					}
+					if (!g_fr_classic.GetBool())
+					{
+						pEntity->AddXP(12);
+					}
+				}
+				if (m_iKillsInSpree == UNSTOPPABLE_AMOUNT)
+				{
+					CFmtStr hint;
+					hint.sprintf("#Valve_Hud_UNSTOPPABLE");
+					pEntity->ShowLevelMessage(hint.Access());
+					if (g_fr_economy.GetBool())
+					{
+						pEntity->AddMoney(10);
+					}
+					if (!g_fr_classic.GetBool())
+					{
+						pEntity->AddXP(15);
+					}
+				}
+				if (m_iKillsInSpree == INCONCEIVABLE_AMOUNT)
+				{
+					CFmtStr hint;
+					hint.sprintf("#Valve_Hud_INCONCEIVABLE");
+					pEntity->ShowLevelMessage(hint.Access());
+					if (g_fr_economy.GetBool())
+					{
+						pEntity->AddMoney(12);
+					}
+					if (!g_fr_classic.GetBool())
+					{
+						pEntity->AddXP(18);
+					}
+				}
+				if (m_iKillsInSpree == INVINCIBLE_AMOUNT)
+				{
+					CFmtStr hint;
+					hint.sprintf("#Valve_Hud_INVINCIBLE");
+					pEntity->ShowLevelMessage(hint.Access());
+					if (g_fr_economy.GetBool())
+					{
+						pEntity->AddMoney(14);
+					}
+					if (!g_fr_classic.GetBool())
+					{
+						pEntity->AddXP(21);
+					}
+				}
+				if (m_iKillsInSpree == GODLIKE_AMOUNT)
+				{
+					CFmtStr hint;
+					hint.sprintf("#Valve_Hud_GODLIKE");
+					pEntity->ShowLevelMessage(hint.Access());
+					if (g_fr_economy.GetBool())
+					{
+						pEntity->AddMoney(16);
+					}
+					if (!g_fr_classic.GetBool())
+					{
+						pEntity->AddXP(24);
+					}
+				}
+			}
+
+			if (pVictim->m_isRareEntity)
+			{
+				if (g_fr_classic.GetBool())
+				{
+					pEntity->LevelUpClassic();
+				}
+			}
+		}
 	}
 
 	//=========================================================
@@ -363,9 +953,17 @@ bool CSingleplayRules::Damage_ShouldNotBleed( int iDmgType )
 	//=========================================================
 	float CSingleplayRules::FlWeaponRespawnTime( CBaseCombatWeapon *pWeapon )
 	{
+		if (sv_weapon_respawn.GetBool())
+		{
+			return sv_weapon_respawn_time.GetFloat();
+		}
+		else
+		{
 		return -1;
 	}
+	}
 
+	#define ENTITY_INTOLERANCE	100
 	//=========================================================
 	// FlWeaponRespawnTime - Returns 0 if the weapon can respawn 
 	// now,  otherwise it returns the time at which it can try
@@ -373,7 +971,11 @@ bool CSingleplayRules::Damage_ShouldNotBleed( int iDmgType )
 	//=========================================================
 	float CSingleplayRules::FlWeaponTryRespawn( CBaseCombatWeapon *pWeapon )
 	{
+		if ( gEntList.NumberOfEntities() < (gpGlobals->maxEntities - ENTITY_INTOLERANCE) )
 		return 0;
+
+		// we're past the entity tolerance level,  so delay the respawn
+		return FlWeaponRespawnTime( pWeapon );
 	}
 
 	//=========================================================
@@ -391,7 +993,21 @@ bool CSingleplayRules::Damage_ShouldNotBleed( int iDmgType )
 	//=========================================================
 	int CSingleplayRules::WeaponShouldRespawn( CBaseCombatWeapon *pWeapon )
 	{
+		if (sv_weapon_respawn.GetBool())
+		{
+			if (pWeapon->HasSpawnFlags(SF_NORESPAWN))
+			{
 		return GR_WEAPON_RESPAWN_NO;
+	}
+			else
+			{
+				return GR_WEAPON_RESPAWN_YES;
+			}
+		}
+		else
+		{
+			return GR_WEAPON_RESPAWN_NO;
+		}
 	}
 
 	//=========================================================
@@ -411,7 +1027,21 @@ bool CSingleplayRules::Damage_ShouldNotBleed( int iDmgType )
 	//=========================================================
 	int CSingleplayRules::ItemShouldRespawn( CItem *pItem )
 	{
+		if (sv_item_respawn.GetBool())
+		{
+			if (pItem->HasSpawnFlags(SF_NORESPAWN))
+			{
+				return GR_ITEM_RESPAWN_NO;
+			}
+			else
+			{
+				return GR_ITEM_RESPAWN_YES;
+			}
+		}
+		else
+		{
 		return GR_ITEM_RESPAWN_NO;
+	}
 	}
 
 
@@ -420,7 +1050,14 @@ bool CSingleplayRules::Damage_ShouldNotBleed( int iDmgType )
 	//=========================================================
 	float CSingleplayRules::FlItemRespawnTime( CItem *pItem )
 	{
+		if (sv_item_respawn.GetBool())
+		{
+			return sv_item_respawn_time.GetFloat();
+		}
+		else
+		{
 		return -1;
+	}
 	}
 
 	//=========================================================
@@ -457,21 +1094,54 @@ bool CSingleplayRules::Damage_ShouldNotBleed( int iDmgType )
 	//=========================================================
 	float CSingleplayRules::FlHealthChargerRechargeTime( void )
 	{
-		return 0;// don't recharge
+		if (sv_healthcharger_recharge.GetBool())
+		{
+			return sv_healthcharger_recharge_time.GetFloat();
+		}
+		else
+		{
+			return 0;// don't recharge
+		}
+	}
+
+	float CSingleplayRules::FlHEVChargerRechargeTime(void)
+	{
+		if (sv_suitcharger_recharge.GetBool())
+		{
+			return sv_suitcharger_recharge_time.GetFloat();
+		}
+		else
+		{
+			return 0;// don't recharge
+		}
 	}
 
 	//=========================================================
 	//=========================================================
 	int CSingleplayRules::DeadPlayerWeapons( CBasePlayer *pPlayer )
 	{
-		return GR_PLR_DROP_GUN_NO;
+		if (sv_player_dropweaponsondeath.GetBool() || sv_mp_pvp.GetBool())
+		{
+			return GR_PLR_DROP_GUN_ACTIVE;
+		}
+		else
+		{
+			return GR_PLR_DROP_GUN_NO;
+		}
 	}
 
 	//=========================================================
 	//=========================================================
 	int CSingleplayRules::DeadPlayerAmmo( CBasePlayer *pPlayer )
 	{
-		return GR_PLR_DROP_AMMO_NO;
+		if (sv_mp_pvp.GetBool())
+		{
+			return GR_PLR_DROP_AMMO_ACTIVE;
+		}
+		else
+		{
+			return GR_PLR_DROP_AMMO_NO;
+		}
 	}
 
 	//=========================================================
@@ -479,14 +1149,21 @@ bool CSingleplayRules::Damage_ShouldNotBleed( int iDmgType )
 	int CSingleplayRules::PlayerRelationship( CBaseEntity *pPlayer, CBaseEntity *pTarget )
 	{
 		// why would a single player in half life need this? 
-		return GR_NOTTEAMMATE;
+		if (sv_mp_pvp.GetBool())
+		{
+			return GR_NOTTEAMMATE;
+		}
+		else
+		{
+			return GR_TEAMMATE;
+		}
 	}
 
 	//=========================================================
 	//=========================================================
 	bool CSingleplayRules::PlayerCanHearChat( CBasePlayer *pListener, CBasePlayer *pSpeaker )
 	{
-		return ( PlayerRelationship( pListener, pSpeaker ) == GR_TEAMMATE );
+		return true;
 	}
 
 	//=========================================================

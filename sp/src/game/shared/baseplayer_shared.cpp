@@ -20,6 +20,7 @@
 	#include "c_basedoor.h"
 	#include "c_world.h"
 	#include "view.h"
+	#include "input.h"
 	#include "client_virtualreality.h"
 	#define CRecipientFilter C_RecipientFilter
 	#include "sourcevr/isourcevirtualreality.h"
@@ -1830,7 +1831,7 @@ void CBasePlayer::SharedSpawn()
 
 	pl.deadflag	= false;
 	m_lifeState	= LIFE_ALIVE;
-	m_iHealth = 100;
+	m_iHealth = 200;
 	m_takedamage		= DAMAGE_YES;
 
 	m_Local.m_bDrawViewmodel = true;

@@ -49,6 +49,8 @@
 
 ConVar	cc_achievement_debug( "achievement_debug", "0", FCVAR_CHEAT | FCVAR_REPLICATED, "Turn on achievement debug msgs." );
 
+ConVar	achievement_showlegacymsgs( "achievement_showlegacymsgs", "0", FCVAR_REPLICATED|FCVAR_ARCHIVE);
+
 #ifdef CSTRIKE_DLL
 //=============================================================================
 // HPE_BEGIN:
@@ -450,6 +452,7 @@ void CAchievementMgr::Update( float frametime )
 	}
 #endif
 
+/*
 #ifndef _DEBUG
 	// keep track if cheats have ever been turned on during this level
 	if ( !WereCheatsEverOn() )
@@ -460,6 +463,7 @@ void CAchievementMgr::Update( float frametime )
 		}
 	}
 #endif
+*/
 
 	// Call think functions. Work backwards, because we may remove achievements from the list.
 	int iCount = m_vecThinkListeners.Count();
@@ -638,7 +642,11 @@ void CAchievementMgr::DownloadUserData()
 		if ( steamapicontext->SteamUserStats() )
 		{
 			// request stat download; will get called back at OnUserStatsReceived when complete
-			steamapicontext->SteamUserStats()->RequestCurrentStats();
+			bool bReqStats = steamapicontext->SteamUserStats()->RequestCurrentStats();
+			if (!bReqStats)
+			{
+				DevMsg("SteamUserStats::RequestCurrentStats() - Cannot aquire stats from Steam.");
+			}
 		}
 #endif
 	}
@@ -889,6 +897,22 @@ void CAchievementMgr::SaveGlobalStateIfDirty( bool bAsync )
 	}
 }
 
+
+#ifdef GAME_DLL
+void CAchievementMgr::ShowAchievementMessage(CBaseEntity *pEntity, const char *pMessage)
+{
+	if (!pEntity)
+		return;
+
+	CSingleUserRecipientFilter user((CBasePlayer *)pEntity);
+	user.MakeReliable();
+	UserMessageBegin(user, "AchievementHintText");
+	WRITE_BYTE(1);	// one string
+	WRITE_STRING(pMessage);
+	MessageEnd();
+}
+#endif
+
 //-----------------------------------------------------------------------------
 // Purpose: awards specified achievement
 //-----------------------------------------------------------------------------
@@ -920,6 +944,23 @@ void CAchievementMgr::AwardAchievement( int iAchievementID )
 	{
 		gamestats->Event_AchievementProgress( pAchievement->GetAchievementID(), pAchievement->GetName() );
 	}
+#endif
+
+#ifdef GAME_DLL
+	CBasePlayer *pEntity = UTIL_GetLocalPlayer();
+	
+	if (!pEntity)
+		return;
+
+	if (achievement_showlegacymsgs.GetBool())
+	{
+		CFmtStr hint;
+		hint.sprintf("#%s_ACHIEVED", pAchievement->GetName());
+		ShowAchievementMessage(pEntity, hint.Access());
+	}
+
+	pEntity->AddXP(pAchievement->GetPointValue());
+	pEntity->AddMoney(pAchievement->GetPointValue());
 #endif
 
     //=============================================================================
@@ -1107,6 +1148,7 @@ bool CAchievementMgr::CheckAchievementsEnabled()
 	return true;
 #endif
 
+	/*
 	if ( IsPC() )
 	{
 		// Don't award achievements if cheats are turned on.  
@@ -1123,6 +1165,7 @@ bool CAchievementMgr::CheckAchievementsEnabled()
 #endif
 		}
 	}
+	*/
 
 	return true;
 }
@@ -1908,6 +1951,26 @@ void CAchievementMgr::UpdateStateFromSteam_Internal()
 	}
 #endif
 }
+
+#ifdef GAME_DLL
+#if defined(_DEBUG) || defined(STAGING_ONLY) || DEBUG_ACHIEVEMENTS_IN_RELEASE
+CON_COMMAND( achievement_hud_debug, "Debug the Achievement HUD")
+{
+	CAchievementMgr *pAchievementMgr = dynamic_cast<CAchievementMgr *>( engine->GetAchievementMgr() );
+	if ( !pAchievementMgr )
+		return;
+
+	CBasePlayer *pEntity = UTIL_GetLocalPlayer();
+
+	if (!pEntity)
+		return;
+
+	CFmtStr hint;
+	hint.sprintf("TESTING..1..2..3!");
+	pAchievementMgr->ShowAchievementMessage(pEntity, hint.Access());
+}
+#endif
+#endif
 
 #ifdef CLIENT_DLL
 

@@ -3454,7 +3454,7 @@ void CNavMesh::BeginGeneration( bool incremental )
 	if (m_walkableSeeds.Count() == 0)
 	{
 		m_generationMode = GENERATE_NONE;
-		Msg( "No valid walkable seed positions.  Cannot generate Navigation Mesh.\n" );
+		Warning( "No valid walkable seed positions.  Cannot generate Navigation Mesh.\n" );
 		return;
 	}
 
