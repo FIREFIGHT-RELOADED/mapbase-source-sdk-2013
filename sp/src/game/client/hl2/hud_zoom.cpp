@@ -125,15 +125,15 @@ bool CHudZoom::ShouldDraw( void )
 
 	if (cl_hud_zoom_draw.GetBool())
 	{
-	if ( pPlayer->m_HL2Local.m_bZooming )
-	{
-		// need to paint
-		bNeedsDraw = true;
-	}
-	else if ( m_bPainted )
-	{
-		// keep painting until state is finished
-		bNeedsDraw = true;
+		if ( pPlayer->m_HL2Local.m_bZooming )
+		{
+			// need to paint
+			bNeedsDraw = true;
+		}
+		else if ( m_bPainted )
+		{
+			// keep painting until state is finished
+			bNeedsDraw = true;
 		}
 	}
 	else

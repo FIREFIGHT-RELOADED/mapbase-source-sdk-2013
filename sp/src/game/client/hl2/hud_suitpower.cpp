@@ -266,7 +266,6 @@ void CHudSuitPower::Paint()
 			}
 			ypos += text2_gap;
 		}
-		//add bullettime as a device!!!
 
 #ifdef MAPBASE
 		if (pPlayer->IsCustomDevice0Active())

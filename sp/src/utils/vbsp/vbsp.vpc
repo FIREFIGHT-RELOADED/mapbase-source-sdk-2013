@@ -68,7 +68,7 @@ $Project "Vbsp"
 		$File	"worldvertextransitionfixup.cpp"
 		$File	"writebsp.cpp"
 		$File	"$SRCDIR\public\zip_utils.cpp"
-
+		
 		$File	"vscript_vbsp.cpp" [$MAPBASE_VSCRIPT]
 		$File	"vscript_vbsp.h" [$MAPBASE_VSCRIPT]
 		$File	"vscript_vbsp.nut" [$MAPBASE_VSCRIPT]

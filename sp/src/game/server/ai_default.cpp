@@ -378,6 +378,10 @@ int CAI_BaseNPC::TranslateSchedule( int scheduleType )
 	return scheduleType;
 }
 
+#ifdef MAPBASE
+extern ScriptHook_t	g_Hook_TranslateSchedule;
+#endif
+
 //=========================================================
 // GetScheduleOfType - returns a pointer to one of the
 // NPC's available schedules of the indicated type.
@@ -391,12 +395,7 @@ CAI_Schedule *CAI_BaseNPC::GetScheduleOfType( int scheduleType )
 	AI_PROFILE_SCOPE_END();
 
 #ifdef MAPBASE_VSCRIPT
-	if ( m_ScriptScope.IsInitialized() )
-	{
-		// Some of this code should know if there's a function first, so look
-		// up the function beforehand instead of using CallScriptFunction()
-		HSCRIPT hFunc = m_ScriptScope.LookupFunction( "NPC_TranslateSchedule" );
-		if (hFunc)
+	if ( m_ScriptScope.IsInitialized() && g_Hook_TranslateSchedule.CanRunInScope(m_ScriptScope) )
 		{
 			int newSchedule = scheduleType;
 			if ( AI_IdIsLocal( newSchedule ) )
@@ -404,12 +403,11 @@ CAI_Schedule *CAI_BaseNPC::GetScheduleOfType( int scheduleType )
 				newSchedule = GetClassScheduleIdSpace()->ScheduleLocalToGlobal(newSchedule);
 			}
 
-			g_pScriptVM->SetValue( "schedule", GetSchedulingSymbols()->ScheduleIdToSymbol( newSchedule ) );
-			g_pScriptVM->SetValue( "schedule_id", scheduleType ); // Use the local ID
-
+		// schedule, schedule_id (local ID)
 			ScriptVariant_t functionReturn;
-			m_ScriptScope.Call( hFunc, &functionReturn );
-
+		ScriptVariant_t args[] = { GetSchedulingSymbols()->ScheduleIdToSymbol( newSchedule ), scheduleType };
+		if (g_Hook_TranslateSchedule.Call( m_ScriptScope, &functionReturn, args ))
+		{
 			if (functionReturn.m_type == FIELD_INTEGER)
 			{
 				newSchedule = functionReturn.m_int;
@@ -421,9 +419,6 @@ CAI_Schedule *CAI_BaseNPC::GetScheduleOfType( int scheduleType )
 
 			if (newSchedule != scheduleType && newSchedule > -1)
 				scheduleType = newSchedule;
-
-			g_pScriptVM->ClearValue( "schedule" );
-			g_pScriptVM->ClearValue( "schedule_id" );
 		}
 	}
 #endif

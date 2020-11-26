@@ -1393,7 +1393,7 @@ int RunVBSP( int argc, char **argv )
 	sprintf( materialPath, "%smaterials", gamedir );
 	InitMaterialSystem( materialPath, CmdLib_GetFileSystemFactory() );
 	Msg( "materialPath: %s\n", materialPath );
-	
+
 #ifdef MAPBASE_VSCRIPT
 	if (g_iScripting)
 	{

@@ -43,7 +43,7 @@ public:
 			delete pScriptVM;
 			return nullptr;
 		}
-		
+
 		// Register base bindings for all VMs
 		RegisterBaseBindings( pScriptVM );
 

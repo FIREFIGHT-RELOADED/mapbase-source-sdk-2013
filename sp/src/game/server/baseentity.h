@@ -557,6 +557,11 @@ public:
 	bool IsFollowingEntity();
 	CBaseEntity *GetFollowedEntity();
 
+#ifdef MAPBASE_VSCRIPT
+	void ScriptFollowEntity( HSCRIPT hBaseEntity, bool bBoneMerge );
+	HSCRIPT ScriptGetFollowedEntity();
+#endif
+
 	// initialization
 	virtual void Spawn( void );
 	virtual void Precache( void ) {}
@@ -2096,6 +2101,10 @@ public:
 	
 	bool ScriptIsRareEnemy() {return m_isRareEntity;}
 	void ScriptSetRareEnemy(bool iSetRare) {m_isRareEntity = iSetRare;}
+	static ScriptHook_t	g_Hook_UpdateOnRemove;
+	static ScriptHook_t	g_Hook_VPhysicsCollision;
+	static ScriptHook_t	g_Hook_FireBullets;
+	static ScriptHook_t	g_Hook_OnDeath;
 #endif
 
 	string_t		m_iszVScripts;
@@ -2103,7 +2112,11 @@ public:
 	CScriptScope	m_ScriptScope;
 	HSCRIPT			m_hScriptInstance;
 	string_t		m_iszScriptId;
+#ifdef MAPBASE_VSCRIPT
+	HSCRIPT			m_pScriptModelKeyValues;
+#else
 	CScriptKeyValues* m_pScriptModelKeyValues;
+#endif
 };
 
 // Send tables exposed in this module.

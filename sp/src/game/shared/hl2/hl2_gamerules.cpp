@@ -1411,21 +1411,29 @@ ConVar  alyx_darkness_force( "alyx_darkness_force", "0", FCVAR_CHEAT | FCVAR_REP
 				if (!pPlayer)//AI Patch Removal
 					continue;
 
-				CBaseEntity *pWeapon = pPlayer->HasNamedPlayerItem("weapon_physcannon");
-
-				if( pWeapon )
+#ifdef MAPBASE
+				// Friendly fire needs to be handled here.
+				if ( pPlayer && !pVictim->MyNPCPointer()->FriendlyFireEnabled() )
+#else
+				if( pPlayer )
+#endif
 				{
-					CBaseCombatWeapon *pCannon = assert_cast <CBaseCombatWeapon*>(pWeapon);
+					CBaseEntity *pWeapon = pPlayer->HasNamedPlayerItem("weapon_physcannon");
 
-					if( pCannon )
+					if( pWeapon )
 					{
-						if( PhysCannonAccountableForObject(pCannon, info.GetInflictor() ) )
+						CBaseCombatWeapon *pCannon = assert_cast <CBaseCombatWeapon*>(pWeapon);
+
+						if( pCannon )
 						{
-							// Antlions can always be squashed!
-							if ( pVictim->Classify() == CLASS_ANTLION )
+							if( PhysCannonAccountableForObject(pCannon, info.GetInflictor() ) )
+							{
+								// Antlions can always be squashed!
+								if ( pVictim->Classify() == CLASS_ANTLION )
 								return true;
 
-  							return false;
+  								return false;
+							}
 						}
 					}
 				}

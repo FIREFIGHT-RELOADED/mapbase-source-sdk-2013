@@ -36,7 +36,6 @@ extern const char *g_MapName;
 // The game's name found in gameinfo.txt. Mostly used for Discord RPC.
 extern char g_iszGameName[128];
 
-#ifdef CLIENT_DLL
 #ifdef MAPBASE_RPC
 void MapbaseRPC_CVarToggle( IConVar *var, const char *pOldString, float flOldValue );
 
@@ -89,7 +88,6 @@ static EHANDLE g_Metadata[NUM_RPCS];
 
 // How long to wait before updating in case multiple variables are changing
 #define RPC_UPDATE_WAIT 0.25f
-#endif
 #endif
 
 #ifdef CLIENT_DLL
@@ -228,7 +226,8 @@ BEGIN_DATADESC( CMapbaseMetadata )
 	DEFINE_INPUT( m_iszRPCDetails, FIELD_STRING, "SetRPCDetails" ),
 
 END_DATADESC()
-#else
+#endif
+
 #ifdef MAPBASE_RPC
 //-----------------------------------------------------------------------------
 // Purpose: Mapbase's special integration with rich presence clients, most notably Discord.
@@ -602,7 +601,6 @@ void MapbaseRPC_CVarToggle( IConVar *var, const char *pOldString, float flOldVal
 		MapbaseRPC_Shutdown();
 	}
 }
-#endif
 #endif
 
 #endif

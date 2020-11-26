@@ -41,7 +41,7 @@ ConVar	sk_barnacle_health( "sk_barnacle_health","0");
 static ConVar npc_barnacle_swallow( "npc_barnacle_swallow", "0", 0, "Use prototype swallow code." );
 
 #ifdef MAPBASE
-ConVar npc_barnacle_ignite( "npc_barnacle_ignite", "1", FCVAR_NONE, "Allows barnacles to be ignited by flares and beyond." );
+ConVar npc_barnacle_ignite( "npc_barnacle_ignite", "0", FCVAR_NONE, "Allows barnacles to be ignited by flares and beyond." );
 #endif
 
 const char *CNPC_Barnacle::m_szGibNames[NUM_BARNACLE_GIBS] =
