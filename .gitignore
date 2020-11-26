@@ -73,3 +73,5 @@ config.cfg
 *.db-wal
 mapbase_release_build_v5_1.zip
 *.bak
+mapbase_release_build_v6.zip
+source-sdk-2013-master.zip
