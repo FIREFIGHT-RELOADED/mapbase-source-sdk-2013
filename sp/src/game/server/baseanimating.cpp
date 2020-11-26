@@ -3817,7 +3817,7 @@ void CBaseAnimating::InputCreateSeparateRagdollClient( inputdata_t &inputdata )
 		pMagnet->m_OnUsed.Set(forceVector, this, pMagnet);
 	}
 
-	CBaseEntity *pRagdoll = CreateRagGib( STRING( GetModelName() ), GetAbsOrigin(), GetAbsAngles(), forceVector, 25.0f );
+	CBaseEntity *pRagdoll = CreateRagGib(this, STRING( GetModelName() ), GetAbsOrigin(), GetAbsAngles(), forceVector, 25.0f );
 
 	if (pRagdoll->GetBaseAnimating())
 	{

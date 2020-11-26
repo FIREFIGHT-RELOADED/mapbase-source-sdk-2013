@@ -80,7 +80,7 @@ LINK_ENTITY_TO_CLASS( npc_combine_ace, CNPC_CombineAce );
 
 extern Activity ACT_WALK_EASY;
 extern Activity ACT_WALK_MARCH;
-extern Activity ACT_COMBINE_THROW_GRENADE;
+//extern Activity ACT_COMBINE_THROW_GRENADE;
 extern Activity ACT_COMBINE_LAUNCH_GRENADE;
 
 //-----------------------------------------------------------------------------

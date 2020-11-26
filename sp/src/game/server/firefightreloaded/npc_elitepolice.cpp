@@ -135,7 +135,9 @@ void CNPC_ElitePolice::DeathSound(const CTakeDamageInfo &info)
 	if (IsOnFire())
 		return;
 
+#ifndef ELITE_METROPOLICE_USES_RESPONSE_SYSTEM
 	m_Sentences.Speak("METROPOLICE_DIE", SENTENCE_PRIORITY_INVALID, SENTENCE_CRITERIA_ALWAYS);
+#endif
 }
 
 
@@ -369,7 +371,7 @@ void CNPC_ElitePolice::NotifyDeadFriend(CBaseEntity* pFriend)
 //=========================================================
 // PainSound
 //=========================================================
-void CNPC_ElitePolice::PainSound(void)
+void CNPC_ElitePolice::PainSound(const CTakeDamageInfo& info)
 {
 	if (gpGlobals->curtime < m_flNextPainSoundTime)
 		return;

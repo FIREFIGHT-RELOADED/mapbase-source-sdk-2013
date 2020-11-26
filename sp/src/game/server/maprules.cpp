@@ -390,6 +390,15 @@ void CGameText::Display( CBaseEntity *pActivator )
 	}
 	else
 	{
+		// If we're in singleplayer, show the message to the player.
+		if ( gpGlobals->maxClients == 1 )
+		{
+			CBasePlayer *pPlayer = UTIL_GetLocalPlayer();
+			UTIL_HudMessage( pPlayer, m_textParms, MessageGet() );
+		}
+		// Otherwise show the message to the player that triggered us.
+		else if ( pActivator && pActivator->IsNetClient() )
+		{
 			UTIL_HudMessage( ToBasePlayer( pActivator ), m_textParms, MessageGet() );
 		}
 	}

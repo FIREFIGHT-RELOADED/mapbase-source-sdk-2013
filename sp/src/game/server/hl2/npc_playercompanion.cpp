@@ -399,7 +399,9 @@ void CNPC_PlayerCompanion::GatherConditions()
 {
 	BaseClass::GatherConditions();
 
-	if ( AI_IsSinglePlayer() )
+	CBasePlayer *pPlayer = ToBasePlayer(GetFollowBehavior().GetFollowTarget());//UTIL_GetNearestPlayer(GetAbsOrigin());
+
+	if (pPlayer)
 	{
 		CBasePlayer *pPlayer = UTIL_GetLocalPlayer();
 
@@ -555,9 +557,9 @@ void CNPC_PlayerCompanion::GatherConditions()
 	}
 #endif
 
-	if ( AI_IsSinglePlayer() && hl2_episodic.GetBool() && !GetEnemy() && HasCondition( COND_HEAR_PLAYER ) )
+	if (pPlayer && hl2_episodic.GetBool() && !GetEnemy() && HasCondition(COND_HEAR_PLAYER))
 	{
-		Vector los = ( UTIL_GetLocalPlayer()->EyePosition() - EyePosition() );
+		Vector los = (pPlayer->EyePosition() - EyePosition());
 		los.z = 0;
 		VectorNormalize( los );
 
@@ -1126,20 +1128,20 @@ int CNPC_PlayerCompanion::TranslateSchedule( int scheduleType )
 
 			if( CanReload() && pWeapon->UsesClipsForAmmo1() && pWeapon->Clip1() < ( pWeapon->GetMaxClip1() * .5 ) && OccupyStrategySlot( SQUAD_SLOT_EXCLUSIVE_RELOAD ) )
 			{
-				CBasePlayer *pPlayer = UTIL_GetNearestPlayer(GetAbsOrigin());
+				CBasePlayer* pPlayer = UTIL_GetNearestPlayer(GetAbsOrigin());
 
-					pWeapon = pPlayer->GetActiveWeapon();
-					if( pWeapon && pWeapon->UsesClipsForAmmo1() && 
-						pWeapon->Clip1() < ( pWeapon->GetMaxClip1() * .75 ) &&
-						pPlayer->GetAmmoCount( pWeapon->GetPrimaryAmmoType() ) )
-					{
+				pWeapon = pPlayer->GetActiveWeapon();
+				if (pWeapon && pWeapon->UsesClipsForAmmo1() &&
+					pWeapon->Clip1() < (pWeapon->GetMaxClip1() * .75) &&
+					pPlayer->GetAmmoCount(pWeapon->GetPrimaryAmmoType()))
+				{
 #ifdef MAPBASE
-						// Less annoying
-						if ( !pWeapon->m_bInReload && (gpGlobals->curtime - GetLastEnemyTime()) > 5.0f )
+					// Less annoying
+					if (!pWeapon->m_bInReload && (gpGlobals->curtime - GetLastEnemyTime()) > 5.0f)
 #endif
-						SpeakIfAllowed( TLK_PLRELOAD );
-					}
+						SpeakIfAllowed(TLK_PLRELOAD);
 				}
+
 				return SCHED_RELOAD;
 			}
 		}
@@ -1415,7 +1417,10 @@ void CNPC_PlayerCompanion::RunTask( const Task_t *pTask )
 
 		case TASK_PC_GET_PATH_OFF_COMPANION:
 			{
-				GetNavigator()->SetAllowBigStep(UTIL_GetNearestPlayer(GetAbsOrigin()));
+				if ( AI_IsSinglePlayer() )
+				{
+					GetNavigator()->SetAllowBigStep( UTIL_GetLocalPlayer() );
+				}
 				ChainRunTask( TASK_MOVE_AWAY_PATH, 48 );
 			}
 			break;
@@ -2105,7 +2110,7 @@ void CNPC_PlayerCompanion::UpdateReadiness()
 		}
 	}
 
- 	if( ai_debug_readiness.GetBool())
+ 	if( ai_debug_readiness.GetBool() )
 	{
 		// Draw the readiness-o-meter
 		Vector vecSpot;
@@ -3490,9 +3495,11 @@ float CNPC_PlayerCompanion::GetIdealSpeed() const
 float CNPC_PlayerCompanion::GetIdealAccel() const
 {
 	float multiplier = 1.0;
-	if (m_bMovingAwayFromPlayer && (UTIL_GetNearestPlayer(GetAbsOrigin())->GetAbsOrigin() - GetAbsOrigin()).Length2DSqr() < Square(3.0*12.0))
+	if ( AI_IsSinglePlayer() )
+	{
+		if ( m_bMovingAwayFromPlayer && (UTIL_PlayerByIndex(1)->GetAbsOrigin() - GetAbsOrigin()).Length2DSqr() < Square(3.0*12.0) )
 			multiplier = 2.0;
-
+	}
 	return BaseClass::GetIdealAccel() * multiplier;
 }
 
@@ -4324,7 +4331,7 @@ bool CNPC_PlayerCompanion::IsNavigationUrgent( void )
 				continue;
 
 			if (pPlayer->FInViewCone(EyePosition()))
-			return false;
+				return false;
 		}
 
 		return true;

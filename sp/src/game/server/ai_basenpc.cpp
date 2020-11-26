@@ -267,9 +267,10 @@ int CAI_Manager::NumAIs()
 
 //-------------------------------------
 
-void CAI_Manager::AddAI( CAI_BaseNPC *pAI )
+int CAI_Manager::AddAI( CAI_BaseNPC *pAI )
 {
 	m_AIs.AddToTail( pAI );
+	return NumAIs() - 1;
 }
 
 //-------------------------------------
@@ -1002,7 +1003,7 @@ int CAI_BaseNPC::OnTakeDamage_Alive( const CTakeDamageInfo &info )
 #endif
 			CBasePlayer *pPlayer = UTIL_GetNearestPlayer(GetAbsOrigin());
 
-			if (pAttacker && pAttacker->IsAlive() && UTIL_GetNearestPlayer(GetAbsOrigin()))
+			if (pAttacker && pAttacker->IsAlive() && pPlayer)
 			{
 				if( pAttacker->GetSquad() != NULL && pAttacker->IsInPlayerSquad() )
 				{
@@ -12715,7 +12716,7 @@ CAI_BaseNPC::CAI_BaseNPC(void)
 	m_interuptSchedule			= NULL;
 	m_nDebugPauseIndex			= 0;
 
-	g_AI_Manager.AddAI( this );
+	SetAIIndex(g_AI_Manager.AddAI(this));
 	lagcompensation->RemoveNpcData(GetAIIndex());
 	
 	if ( g_AI_Manager.NumAIs() == 1 )

@@ -168,104 +168,9 @@ void ResetFileWeaponInfoDatabase( void )
 #ifdef _DEBUG
 	memset(g_bUsedWeaponSlots, 0, sizeof(g_bUsedWeaponSlots));
 #endif
+#endif
 }
 #endif
-
-/*
-#ifdef CLIENT_DLL
-
-
-#define CWeaponCustom C_WeaponCustom 
-static C_BaseEntity *CCHL2MPScriptedWeaponFactory(void)
-{
-	return static_cast< C_BaseEntity * >(new CWeaponCustom);
-};
-#endif
-
-#ifndef CLIENT_DLL
-static CUtlDict< CEntityFactory<CWeaponCustom>*, unsigned short > m_WeaponFactoryDatabase;
-#endif
-
-void RegisterScriptedWeapon(const char *className)
-{
-#ifdef CLIENT_DLL
-	if (GetClassMap().FindFactory(className))
-	{
-		return;
-	}
-	GetClassMap().Add(className, "CWeaponCustom", sizeof(CWeaponCustom),
-		&CCHL2MPScriptedWeaponFactory, true);
-	//GetClassMap().Add( className, "CWeaponCustom", sizeof( C_HLSelectFireMachineGun));
-#else
-	if (EntityFactoryDictionary()->FindFactory(className))
-	{
-		return;
-	}
-
-	unsigned short lookup = m_WeaponFactoryDatabase.Find(className);
-	if (lookup != m_WeaponFactoryDatabase.InvalidIndex())
-	{
-		return;
-	}
-
-	// Andrew; This fixes months worth of pain and anguish.
-	CEntityFactory<CWeaponCustom> *pFactory = new CEntityFactory<CWeaponCustom>(className);
-
-	lookup = m_WeaponFactoryDatabase.Insert(className, pFactory);
-	Assert(lookup != m_WeaponFactoryDatabase.InvalidIndex());
-#endif
-	// BUGBUG: When attempting to precache weapons registered during runtime,
-	// they don't appear as valid registered entities.
-	// static CPrecacheRegister precache_weapon_(&CPrecacheRegister::PrecacheFn_Other, className);
-}
-void InitCustomWeapon(void)
-{
-	FileFindHandle_t findHandle; // note: FileFINDHandle
-
-	const char *pFilename = filesystem->FindFirstEx("scripts/*.txt", "MOD", &findHandle);
-	while (pFilename)
-	{
-		if (Q_strncmp(pFilename, "weapon_custom_", strlen("weapon_custom_")) == 0)
-		{
-#ifdef CLIENT_DLL
-			Msg("'%s' added to Custom Weapon list on Client!\n", pFilename);
-#else
-			Msg("'%s' added to Custom Weapon list on Server!\n", pFilename);
-#endif
-
-#if !defined(CLIENT_DLL)
-			//	CEntityFactory<CWeaponCustom> weapon_custom( pFilename );
-			//	UTIL_PrecacheOther(pFilename);
-#endif
-			char fileBase[512] = "";
-			Q_FileBase(pFilename, fileBase, sizeof(fileBase));
-			RegisterScriptedWeapon(fileBase);
-			//CEntityFactory<CWeaponCustom>(CEntityFactory<CWeaponCustom> &);
-			//LINK_ENTITY_TO_CLASS2(pFilename,CWeaponCustom);
-
-			WEAPON_FILE_INFO_HANDLE tmp;
-#ifdef CLIENT_DLL
-			if (ReadWeaponDataFromFileForSlot(filesystem, fileBase, &tmp))
-			{
-				gWR.LoadWeaponSprites(tmp);
-			}
-#else
-			ReadWeaponDataFromFileForSlot(filesystem, fileBase, &tmp);
-#endif
-
-
-			pFilename = filesystem->FindNext(findHandle);
-		}
-		else
-		{
-			pFilename = filesystem->FindNext(findHandle);
-		}
-	}
-
-	filesystem->FindClose(findHandle);
-
-}
-*/
 
 void PrecacheFileWeaponInfoDatabase( IFileSystem *filesystem, const unsigned char *pICEKey )
 {
@@ -547,19 +452,19 @@ void FileWeaponInfo_t::Parse( KeyValues *pKeyValuesData, const char *szWeaponNam
 #endif
 
 	// Primary ammo used
-	const char *pAmmo = pKeyValuesData->GetString( "primary_ammo", "None" );
-	if ( strcmp("None", pAmmo) == 0 )
+	cAmmoType = pKeyValuesData->GetString("primary_ammo", "None");
+	if (strcmp("None", cAmmoType) == 0)
 		Q_strncpy( szAmmo1, "", sizeof( szAmmo1 ) );
 	else
-		Q_strncpy( szAmmo1, pAmmo, sizeof( szAmmo1 )  );
+		Q_strncpy(szAmmo1, cAmmoType, sizeof(szAmmo1));
 	iAmmoType = GetAmmoDef()->Index( szAmmo1 );
 	
 	// Secondary ammo used
-	pAmmo = pKeyValuesData->GetString( "secondary_ammo", "None" );
-	if ( strcmp("None", pAmmo) == 0)
+	cAmmo2Type = pKeyValuesData->GetString("secondary_ammo", "None");
+	if (strcmp("None", cAmmo2Type) == 0)
 		Q_strncpy( szAmmo2, "", sizeof( szAmmo2 ) );
 	else
-		Q_strncpy( szAmmo2, pAmmo, sizeof( szAmmo2 )  );
+		Q_strncpy(szAmmo2, cAmmo2Type, sizeof(szAmmo2));
 	iAmmo2Type = GetAmmoDef()->Index( szAmmo2 );
 
 	//ironsights

@@ -135,7 +135,7 @@ private:
 	// Do not make the functions in this block virtual!!
 	// {
 	bool DoorActivate();
-	void DoorOpen( CBaseEntity *pOpenAwayFrom );
+	//void DoorOpen( CBaseEntity *pOpenAwayFrom );
 	void OpenIfUnlocked(CBaseEntity *pActivator, CBaseEntity *pOpenAwayFrom);
 
 	void DoorOpenMoveDone();

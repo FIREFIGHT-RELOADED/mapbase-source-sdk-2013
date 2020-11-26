@@ -1459,8 +1459,6 @@ void CHL2_Player::PostThink( void )
 	angles[PITCH] = 0;
 	SetLocalAngles(angles);
 
-	m_pPlayerAnimState->Update();
-
 	if (!IsDead())
 	{
 		if (m_afButtonReleased & IN_KICK && m_flNextKickAttack < gpGlobals->curtime /* && m_flNextKickAttack < gpGlobals->curtime  && !m_bIsKicking*/)
@@ -2436,12 +2434,6 @@ void CHL2_Player::InitVCollision( const Vector &vecAbsOrigin, const Vector &vecA
 
 CHL2_Player::~CHL2_Player( void )
 {
-	// Clears the animation state.
-	if (m_pPlayerAnimState != NULL)
-	{
-		m_pPlayerAnimState->Release();
-		m_pPlayerAnimState = NULL;
-	}
 }
 
 //-----------------------------------------------------------------------------

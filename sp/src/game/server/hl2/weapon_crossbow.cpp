@@ -620,8 +620,6 @@ private:
 	bool				m_bMustReload;
 };
 
-IMPLEMENT_ACTTABLE(CWeaponCrossbow);
-
 LINK_ENTITY_TO_CLASS( weapon_crossbow, CWeaponCrossbow );
 
 PRECACHE_WEAPON_REGISTER( weapon_crossbow );

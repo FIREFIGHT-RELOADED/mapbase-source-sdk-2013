@@ -204,8 +204,6 @@ public:
 	void			OnStartSchedule( int scheduleType );
 
 	virtual bool	ShouldPickADeathPose( void );
-	// Select the combat schedule
-	int SelectCombatSchedule();
 
 protected:
 	void			SetKickDamage( int nDamage ) { m_nKickDamage = nDamage; }
@@ -330,18 +328,6 @@ private:
 	bool			m_bFirstEncounter;// only put on the handsign show in the squad's first encounter.
 	bool			m_bfireGrenadeAsAce;
 
-	// Time Variables
-	float			m_flNextPainSoundTime;
-	float			m_flNextAlertSoundTime;
-#ifndef MAPBASE
-	float			m_flNextGrenadeCheck;	
-#endif
-	float			m_flNextLostSoundTime;
-	float			m_flAlertPatrolTime;		// When to stop doing alert patrol
-#ifndef MAPBASE
-	float			m_flNextAltFireTime;		// Elites only. Next time to begin considering alt-fire attack.
-#endif
-
 	int				m_nShots;
 	float			m_flShotDelay;
 	float			m_flStopMoveShootTime;
@@ -355,14 +341,12 @@ private:
 #endif
 	CAI_AssaultBehavior			m_AssaultBehavior;
 	CCombineStandoffBehavior	m_StandoffBehavior;
-	CAI_FollowBehavior			m_FollowBehavior;
+	//CAI_FollowBehavior			m_FollowBehavior;
 	CAI_FuncTankBehavior		m_FuncTankBehavior;
 	CAI_RappelBehavior			m_RappelBehavior;
 	CAI_ActBusyBehavior			m_ActBusyBehavior;
 
 public:
-	CAI_AssaultBehavior			m_AssaultBehavior;
-	int				m_iNumGrenades;
 	int				m_iLastAnimEventHandled;
 	bool			m_fIsElite;
 	bool			m_fIsAce;
@@ -371,14 +355,21 @@ public:
 #ifndef MAPBASE
 	Vector			m_vecAltFireTarget;
 #endif
+
+	// Time Variables
 	float			m_flNextPainSoundTime;
 	float			m_flNextAlertSoundTime;
+#ifndef MAPBASE
+	float			m_flNextGrenadeCheck;
+#endif
 	float			m_flNextLostSoundTime;
+	float			m_flAlertPatrolTime;		// When to stop doing alert patrol
+#ifndef MAPBASE
+	float			m_flNextAltFireTime;		// Elites only. Next time to begin considering alt-fire attack.
+#endif
 
 	int				m_iTacticalVariant;
 	int				m_iPathfindingVariant;
-	CAI_Sentence< CNPC_Combine > m_Sentences;
-
 	CAI_FollowBehavior			m_FollowBehavior;
 };
 

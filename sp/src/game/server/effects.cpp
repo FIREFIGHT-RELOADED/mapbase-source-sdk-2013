@@ -545,9 +545,9 @@ CBaseEntity *CGibShooter::SpawnGib( const Vector &vecShootDir, float flSpeed )
 			// UNDONE: Assume a mass of 200 for now
 			Vector force = vecShootDir * flSpeed * 200;
 #ifdef MAPBASE
-			return CreateRagGib( STRING( GetModelName() ), GetAbsOrigin(), GetAbsAngles(), force, m_flGibLife, HasSpawnFlags(SF_SHOOTER_FLAMING) );
+			return CreateRagGib(this, STRING( GetModelName() ), GetAbsOrigin(), GetAbsAngles(), force, m_flGibLife, HasSpawnFlags(SF_SHOOTER_FLAMING) );
 #else
-			return CreateRagGib( STRING( GetModelName() ), GetAbsOrigin(), GetAbsAngles(), force, m_flGibLife );
+			return CreateRagGib(this, STRING( GetModelName() ), GetAbsOrigin(), GetAbsAngles(), force, m_flGibLife );
 #endif
 		}
 

@@ -2258,31 +2258,31 @@ void CNPC_AntlionWorker::ZapThink( void )
 // Purpose: 
 // Output : int
 //-----------------------------------------------------------------------------
-int CNPC_AntlionWorker::SelectSchedule( void )
+int CNPC_AntlionWorker::SelectSchedule(void)
 {
 	// Workers explode when killed unless told otherwise by anim events etc.
 	m_bDontExplode = false;
 
 	// Clear out this condition
-	ClearCondition( COND_ANTLIONWORKER_RECEIVED_ORDERS );
+	ClearCondition(COND_ANTLIONWORKER_RECEIVED_ORDERS);
 
 	// If we're supposed to be burrowed, stay there
-	if ( m_bStartBurrowed )
+	if (m_bStartBurrowed)
 		return SCHED_ANTLIONWORKER_WAIT_FOR_UNBORROW_TRIGGER;
 
 	// See if a friendly player is pushing us away
-	if ( HasCondition( COND_PLAYER_PUSHING ) )
+	if (HasCondition(COND_PLAYER_PUSHING))
 		return SCHED_MOVE_AWAY;
 
 	//Flipped?
-	if ( HasCondition( COND_ANTLIONWORKER_FLIPPED ) )
+	if (HasCondition(COND_ANTLIONWORKER_FLIPPED))
 	{
-		ClearCondition( COND_ANTLIONWORKER_FLIPPED );
-		
+		ClearCondition(COND_ANTLIONWORKER_FLIPPED);
+
 		// See if it's a forced, electrical flip
-		if ( m_flZapDuration > gpGlobals->curtime )
+		if (m_flZapDuration > gpGlobals->curtime)
 		{
-			SetContextThink( &CNPC_AntlionWorker::ZapThink, gpGlobals->curtime, "ZapThink" );
+			SetContextThink(&CNPC_Antlion::ZapThink, gpGlobals->curtime, "ZapThink");
 			return SCHED_ANTLIONWORKER_ZAP_FLIP;
 		}
 
@@ -2290,288 +2290,290 @@ int CNPC_AntlionWorker::SelectSchedule( void )
 		return SCHED_ANTLIONWORKER_FLIP;
 	}
 
-	if( HasCondition( COND_ANTLIONWORKER_IN_WATER ) )
+	if (HasCondition(COND_ANTLIONWORKER_IN_WATER))
 	{
 		// No matter what, drown in water
 		return SCHED_ANTLIONWORKER_DROWN;
 	}
 
 	// If we're flagged to burrow away when eluded, do so
-	if ((m_spawnflags & SF_ANTLIONWORKER_BURROW_ON_ELUDED) && (HasCondition(COND_ENEMY_UNREACHABLE) || HasCondition(COND_ENEMY_TOO_FAR)))
+	if ((m_spawnflags & SF_ANTLION_BURROW_ON_ELUDED) && (HasCondition(COND_ENEMY_UNREACHABLE) || HasCondition(COND_ENEMY_TOO_FAR)))
 		return SCHED_ANTLIONWORKER_BURROW_AWAY;
 
 	//Hear a thumper?
-	if ( HasCondition( COND_HEAR_THUMPER ) )
+	if (HasCondition(COND_HEAR_THUMPER))
 	{
 		// Ignore thumpers that aren't visible
-		CSound *pSound = GetLoudestSoundOfType( SOUND_THUMPER );
-		
-		if ( pSound )
+		CSound* pSound = GetLoudestSoundOfType(SOUND_THUMPER);
+
+		if (pSound)
 		{
 			CTakeDamageInfo info;
-			PainSound( info );
-			ClearCondition( COND_HEAR_THUMPER );
+			PainSound(info);
+			ClearCondition(COND_HEAR_THUMPER);
 
 			return SCHED_ANTLIONWORKER_FLEE_THUMPER;
 		}
 	}
 
 	//Hear a physics danger sound?
-	if( HasCondition( COND_HEAR_PHYSICS_DANGER ) )
+	if (HasCondition(COND_HEAR_PHYSICS_DANGER))
 	{
 		CTakeDamageInfo info;
-		PainSound( info );
+		PainSound(info);
 		return SCHED_ANTLIONWORKER_FLEE_PHYSICS_DANGER;
 	}
 
 	//On another NPC's head?
-	if( HasCondition( COND_ANTLIONWORKER_ON_NPC ) )
+	if (HasCondition(COND_ANTLIONWORKER_ON_NPC))
 	{
 		// You're on an NPC's head. Get off.
 		return SCHED_ANTLIONWORKER_DISMOUNT_NPC;
 	}
 
 	// If we're scripted to jump at a target, do so
-	if ( HasCondition( COND_ANTLIONWORKER_CAN_JUMP_AT_TARGET ) )
+	if (HasCondition(COND_ANTLIONWORKER_CAN_JUMP_AT_TARGET))
 	{
 		// NDebugOverlay::Cross3D( m_vecSavedJump, 32.0f, 255, 0, 0, true, 2.0f );
-		ClearCondition( COND_ANTLIONWORKER_CAN_JUMP_AT_TARGET );
+		ClearCondition(COND_ANTLIONWORKER_CAN_JUMP_AT_TARGET);
 		return SCHED_ANTLIONWORKER_JUMP;
 	}
 
 	//Hear bug bait splattered?
-	if ( HasCondition( COND_HEAR_BUGBAIT ) && ( m_bIgnoreBugbait == false ) )
+	if (HasCondition(COND_HEAR_BUGBAIT) && (m_bIgnoreBugbait == false))
 	{
 		//Play a special sound
-		if ( m_flNextAcknowledgeTime < gpGlobals->curtime )
+		if (m_flNextAcknowledgeTime < gpGlobals->curtime)
 		{
-			EmitSound( "NPC_Antlion.Distracted" );
+			EmitSound("NPC_Antlion.Distracted");
 			m_flNextAcknowledgeTime = gpGlobals->curtime + 1.0f;
 		}
-		
+
 		m_flIdleDelay = gpGlobals->curtime + 4.0f;
 
 		//If the sound is valid, act upon it
-		if ( m_bHasHeardSound )
-		{		
+		if (m_bHasHeardSound)
+		{
 			//Mark anything in the area as more interesting
-			CBaseEntity *pTarget = NULL;
-			CBaseEntity *pNewEnemy = NULL;
+			CBaseEntity* pTarget = NULL;
+			CBaseEntity* pNewEnemy = NULL;
 			Vector		soundOrg = m_vecHeardSound;
 
 			//Find all entities within that sphere
-			while ( ( pTarget = gEntList.FindEntityInSphere( pTarget, soundOrg, bugbait_radius.GetInt() ) ) != NULL )
+			while ((pTarget = gEntList.FindEntityInSphere(pTarget, soundOrg, bugbait_radius.GetInt())) != NULL)
 			{
-				CAI_BaseNPC *pNPC = pTarget->MyNPCPointer();
+				CAI_BaseNPC* pNPC = pTarget->MyNPCPointer();
 
-				if ( pNPC == NULL )
+				if (pNPC == NULL)
 					continue;
 
-				if ( pNPC->CanBeAnEnemyOf( this ) == false )
+				if (pNPC->CanBeAnEnemyOf(this) == false)
 					continue;
 
 				//Check to see if the default relationship is hatred, and if so intensify that
-				if ( ( IRelationType( pNPC ) == D_HT ) && ( pNPC->IsPlayer() == false ) )
+				if ((IRelationType(pNPC) == D_HT) && (pNPC->IsPlayer() == false))
 				{
-					AddEntityRelationship( pNPC, D_HT, 99 );
-					
+					AddEntityRelationship(pNPC, D_HT, 99);
+
 					//Try to spread out the enemy distribution
-					if ( ( pNewEnemy == NULL ) || ( random->RandomInt( 0, 1 ) ) )
+					if ((pNewEnemy == NULL) || (random->RandomInt(0, 1)))
 					{
 						pNewEnemy = pNPC;
 						continue;
 					}
 				}
 			}
-			
+
 			// If we have a new enemy, take it
-			if ( pNewEnemy != NULL )
+			if (pNewEnemy != NULL)
 			{
 				//Setup our ignore info
-				SetEnemy( pNewEnemy );
+				SetEnemy(pNewEnemy);
 			}
-			
-			ClearCondition( COND_HEAR_BUGBAIT );
+
+			ClearCondition(COND_HEAR_BUGBAIT);
 
 			return SCHED_ANTLIONWORKER_CHASE_BUGBAIT;
 		}
 	}
 
-	if( m_AssaultBehavior.CanSelectSchedule() )
+	if (m_AssaultBehavior.CanSelectSchedule())
 	{
-		DeferSchedulingToBehavior( &m_AssaultBehavior );
+		DeferSchedulingToBehavior(&m_AssaultBehavior);
 		return BaseClass::SelectSchedule();
 	}
 
 	//Otherwise do basic state schedule selection
-	switch ( m_NPCState )
+	switch (m_NPCState)
 	{
 	case NPC_STATE_IDLE:
-		{
-			return SCHED_PATROL_WALK_LOOP;
-		}
-		break;
+	{
+		return SCHED_PATROL_WALK_LOOP;
+	}
+	break;
 
 	case NPC_STATE_ALERT:
-		{
-			return SCHED_PATROL_WALK_LOOP;
-		}
-		break;
+	{
+		return SCHED_PATROL_WALK_LOOP;
+	}
+	break;
 
 	case NPC_STATE_COMBAT:
+	{
+		// Worker-only AI
+		if (hl2_episodic.GetBool())
 		{
-			// Worker-only AI
 			// Melee attack if we can
-			if ( HasCondition( COND_CAN_MELEE_ATTACK1 ) )
+			if (HasCondition(COND_CAN_MELEE_ATTACK1))
 				return SCHED_MELEE_ATTACK1;
 
 			// Pounce if they're too near us
-			if ( HasCondition( COND_CAN_MELEE_ATTACK2 ) )
+			if (HasCondition(COND_CAN_MELEE_ATTACK2))
 			{
 				m_flPounceTime = gpGlobals->curtime + 1.5f;
 
-				if ( m_bLeapAttack == true )
+				if (m_bLeapAttack == true)
 					return SCHED_ANTLIONWORKER_POUNCE_MOVING;
 
 				return SCHED_ANTLIONWORKER_POUNCE;
 			}
 
 			// A squadmate died, so run away!
-			if ( HasCondition( COND_ANTLIONWORKER_SQUADMATE_KILLED ) )
+			if (HasCondition(COND_ANTLIONWORKER_SQUADMATE_KILLED))
 			{
-				SetNextAttack( gpGlobals->curtime + random->RandomFloat( 2.0f, 4.0f ) );
-				ClearCondition( COND_ANTLIONWORKER_SQUADMATE_KILLED );
+				SetNextAttack(gpGlobals->curtime + random->RandomFloat(2.0f, 4.0f));
+				ClearCondition(COND_ANTLIONWORKER_SQUADMATE_KILLED);
 				return SCHED_ANTLIONWORKER_TAKE_COVER_FROM_ENEMY;
 			}
 
 			// Flee on heavy damage
-			if ( HasCondition( COND_HEAVY_DAMAGE ) )
+			if (HasCondition(COND_HEAVY_DAMAGE))
 			{
-				SetNextAttack( gpGlobals->curtime + random->RandomFloat( 2.0f, 4.0f ) );
+				SetNextAttack(gpGlobals->curtime + random->RandomFloat(2.0f, 4.0f));
 				return SCHED_ANTLIONWORKER_TAKE_COVER_FROM_ENEMY;
 			}
 
 			// Range attack if we're able
-			if ( HasCondition( COND_CAN_RANGE_ATTACK1 ) )
+			if (HasCondition(COND_CAN_RANGE_ATTACK1))
 			{
-				if ( OccupyStrategySlot( SQUAD_SLOT_ANTLIONWORKER_FIRE ) )
+				if (OccupyStrategySlot(SQUAD_SLOT_ANTLIONWORKER_FIRE))
 				{
-					EmitSound( "NPC_Antlion.PoisonBurstScream" );
-					SetNextAttack( gpGlobals->curtime + random->RandomFloat( 0.5f, 2.5f ) );
-					if ( GetEnemy() )
+					EmitSound("NPC_Antlion.PoisonBurstScream");
+					SetNextAttack(gpGlobals->curtime + random->RandomFloat(0.5f, 2.5f));
+					if (GetEnemy())
 					{
-						m_vSavePosition = GetEnemy()->BodyTarget( GetAbsOrigin() );
+						m_vSavePosition = GetEnemy()->BodyTarget(GetAbsOrigin());
 					}
 
 					return SCHED_ANTLIONWORKER_WORKER_RANGE_ATTACK1;
 				}
 			}
-			
+
 #ifdef MAPBASE
-				// "Nemesis" is assigned to enemies we hate with 10+ priority.
-				// Since bugbait targets are given 99 priority, this means the AI here usually only applies
-				// when the antlion worker is following bugbait.
-				// 
-				// This is just so antlion workers are more potent when commanded by bugbait,
-				// which wasn't explored in the official games, but may be used in HL2 mods.
-				if ( m_hFollowTarget && IsAllied() /*HasCondition( COND_SEE_NEMESIS )*/ )
+			// "Nemesis" is assigned to enemies we hate with 10+ priority.
+			// Since bugbait targets are given 99 priority, this means the AI here usually only applies
+			// when the antlion worker is following bugbait.
+			// 
+			// This is just so antlion workers are more potent when commanded by bugbait,
+			// which wasn't explored in the official games, but may be used in HL2 mods.
+			if (m_hFollowTarget && IsAllied() /*HasCondition( COND_SEE_NEMESIS )*/)
+			{
+				// Establish LOF if we can't see the enemy
+				if (HasCondition(COND_ENEMY_OCCLUDED))
+					return SCHED_ESTABLISH_LINE_OF_FIRE;
+
+				// See if we need to destroy breakable cover
+				if (HasCondition(COND_WEAPON_SIGHT_OCCLUDED))
+					return SCHED_SHOOT_ENEMY_COVER;
+
+				// Just face as usual if we're not too close to attack,
+				// otherwise fall back to base class and charge like any other antlion
+				if (!HasCondition(COND_TOO_CLOSE_TO_ATTACK))
 				{
-					// Establish LOF if we can't see the enemy
-					if ( HasCondition( COND_ENEMY_OCCLUDED ) )
-						return SCHED_ESTABLISH_LINE_OF_FIRE;
-
-					// See if we need to destroy breakable cover
-					if ( HasCondition( COND_WEAPON_SIGHT_OCCLUDED ) )
-						return SCHED_SHOOT_ENEMY_COVER;
-
-					// Just face as usual if we're not too close to attack,
-					// otherwise fall back to base class and charge like any other antlion
-					if ( !HasCondition( COND_TOO_CLOSE_TO_ATTACK ) )
-					{
-						// Run around randomly if our target is looking in our direction
-						if ( HasCondition( COND_BEHIND_ENEMY ) == false )
-							return SCHED_ANTLION_WORKER_RUN_RANDOM;
-
-						return SCHED_COMBAT_FACE;
-					}
-				}
-				else
-				{
-#endif
-				
-					// Back up, we're too near an enemy or can't see them
-					if ( HasCondition( COND_TOO_CLOSE_TO_ATTACK ) || HasCondition( COND_ENEMY_OCCLUDED ) )
-						return SCHED_ESTABLISH_LINE_OF_FIRE;
-
-					// See if we need to destroy breakable cover
-					if ( HasCondition( COND_WEAPON_SIGHT_OCCLUDED ) )
-						return SCHED_SHOOT_ENEMY_COVER;
-
 					// Run around randomly if our target is looking in our direction
-					if ( HasCondition( COND_BEHIND_ENEMY ) == false )
-						return SCHED_ANTLIONWORKER_WORKER_FLANK_RANDOM;
+					if (HasCondition(COND_BEHIND_ENEMY) == false)
+						return SCHED_ANTLIONWORKER_WORKER_RUN_RANDOM;
 
-					// Face our target and continue to fire
 					return SCHED_COMBAT_FACE;
-#ifdef MAPBASE
 				}
-#endif
 			}
 			else
 			{
-				// Lunge at the enemy
-				if ( HasCondition( COND_CAN_MELEE_ATTACK2 ) )
-				{
-					m_flPounceTime = gpGlobals->curtime + 1.5f;
+#endif
 
-					if ( m_bLeapAttack == true )
-						return SCHED_ANTLION_POUNCE_MOVING;
-					else
-						return SCHED_ANTLION_POUNCE;
-				}
+				// Back up, we're too near an enemy or can't see them
+				if (HasCondition(COND_TOO_CLOSE_TO_ATTACK) || HasCondition(COND_ENEMY_OCCLUDED))
+					return SCHED_ESTABLISH_LINE_OF_FIRE;
 
-				// Try to jump
-				if ( HasCondition( COND_ANTLION_CAN_JUMP ) )
-					return SCHED_ANTLION_JUMP;
+				// See if we need to destroy breakable cover
+				if (HasCondition(COND_WEAPON_SIGHT_OCCLUDED))
+					return SCHED_SHOOT_ENEMY_COVER;
+
+				// Run around randomly if our target is looking in our direction
+				if (HasCondition(COND_BEHIND_ENEMY) == false)
+					return SCHED_ANTLIONWORKER_WORKER_FLANK_RANDOM;
+
+				// Face our target and continue to fire
+				return SCHED_COMBAT_FACE;
+#ifdef MAPBASE
 			}
+#endif
 		}
-		break;
+		else
+		{
+			// Lunge at the enemy
+			if (HasCondition(COND_CAN_MELEE_ATTACK2))
+			{
+				m_flPounceTime = gpGlobals->curtime + 1.5f;
+
+				if (m_bLeapAttack == true)
+					return SCHED_ANTLIONWORKER_POUNCE_MOVING;
+				else
+					return SCHED_ANTLIONWORKER_POUNCE;
+			}
+
+			// Try to jump
+			if (HasCondition(COND_ANTLIONWORKER_CAN_JUMP))
+				return SCHED_ANTLIONWORKER_JUMP;
+		}
+	}
+	break;
 
 	default:
+	{
+		int	moveSched = ChooseMoveSchedule();
+
+		if (moveSched != SCHED_NONE)
+			return moveSched;
+
+		if (GetEnemy() == NULL && (HasCondition(COND_LIGHT_DAMAGE) || HasCondition(COND_HEAVY_DAMAGE)))
 		{
-			int	moveSched = ChooseMoveSchedule();
+			Vector vecEnemyLKP;
 
-			if ( moveSched != SCHED_NONE )
-				return moveSched;
-
-			if ( GetEnemy() == NULL && ( HasCondition( COND_LIGHT_DAMAGE ) || HasCondition( COND_HEAVY_DAMAGE ) ) )
+			// Retrieve a memory for the damage taken
+			// Fill in where we're trying to look
+			if (GetEnemies()->Find(AI_UNKNOWN_ENEMY))
 			{
-				Vector vecEnemyLKP;
-
-				// Retrieve a memory for the damage taken
-				// Fill in where we're trying to look
-				if ( GetEnemies()->Find( AI_UNKNOWN_ENEMY ) )
-				{
-					vecEnemyLKP = GetEnemies()->LastKnownPosition( AI_UNKNOWN_ENEMY );
-				}
-				else
-				{
-					// Don't have an enemy, so face the direction the last attack came from (don't face north)
-					vecEnemyLKP = WorldSpaceCenter() + ( g_vecAttackDir * 128 );
-				}
-				
-				// If we're already facing the attack direction, then take cover from it
-				if ( FInViewCone( vecEnemyLKP ) )
-				{
-					// Save this position for our cover search
-					m_vSavePosition = vecEnemyLKP;
-					return SCHED_ANTLIONWORKER_TAKE_COVER_FROM_SAVEPOSITION;
-				}
-				
-				// By default, we'll turn to face the attack
+				vecEnemyLKP = GetEnemies()->LastKnownPosition(AI_UNKNOWN_ENEMY);
 			}
+			else
+			{
+				// Don't have an enemy, so face the direction the last attack came from (don't face north)
+				vecEnemyLKP = WorldSpaceCenter() + (g_vecAttackDir * 128);
+			}
+
+			// If we're already facing the attack direction, then take cover from it
+			if (FInViewCone(vecEnemyLKP))
+			{
+				// Save this position for our cover search
+				m_vSavePosition = vecEnemyLKP;
+				return SCHED_ANTLIONWORKER_TAKE_COVER_FROM_SAVEPOSITION;
+			}
+
+			// By default, we'll turn to face the attack
 		}
-		break;
+	}
+	break;
 	}
 
 	return BaseClass::SelectSchedule();
@@ -4233,7 +4235,7 @@ void CNPC_AntlionWorker::SetFollowTarget( CBaseEntity *pTarget )
 // Purpose: 
 // Input  : &inputdata - 
 //-----------------------------------------------------------------------------
-void CNPC_Antlion::InputSetFollowTarget( inputdata_t &inputdata )
+void CNPC_AntlionWorker::InputSetFollowTarget( inputdata_t &inputdata )
 {
 	if ( IsAlive() == false )
 		return;

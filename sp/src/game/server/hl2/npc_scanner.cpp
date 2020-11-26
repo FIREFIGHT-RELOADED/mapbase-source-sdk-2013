@@ -565,6 +565,7 @@ void CNPC_CScanner::NPCThink(void)
 			MineBehavior();
 		}
 	}
+}
 
 void CNPC_CScanner::MineBehavior(void)
 {

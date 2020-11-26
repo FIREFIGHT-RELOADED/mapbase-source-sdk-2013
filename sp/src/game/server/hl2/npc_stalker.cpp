@@ -404,7 +404,7 @@ void CNPC_Stalker::Event_Killed( const CTakeDamageInfo &info )
 }
 
 #ifdef MAPBASE
-extern void DispatchParticleEffect( const char *pszParticleName, Vector vecOrigin, QAngle vecAngles, CBaseEntity *pEntity = NULL );
+//extern void DispatchParticleEffect( const char *pszParticleName, Vector vecOrigin, QAngle vecAngles, CBaseEntity *pEntity = NULL );
 
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------

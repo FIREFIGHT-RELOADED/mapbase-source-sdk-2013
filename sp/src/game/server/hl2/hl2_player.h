@@ -382,7 +382,7 @@ public:
 	CSoundPatch *m_sndLeeches;
 	CSoundPatch *m_sndWaterSplashes;
 
-	void SetAnimation(PLAYER_ANIM playerAnim);
+	//void SetAnimation(PLAYER_ANIM playerAnim);
 
 	// Tracks our ragdoll entity.
 	CNetworkHandle(CBaseEntity, m_hRagdoll);	// networked entity handle 

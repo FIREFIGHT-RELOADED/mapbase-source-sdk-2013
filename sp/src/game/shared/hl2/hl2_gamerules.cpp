@@ -45,7 +45,7 @@ END_NETWORK_TABLE()
 
 #if MAPBASE && GAME_DLL
 extern bool g_bUseLegacyFlashlight;
-extern bool g_bCacheLegacyFlashlightStatus;
+//extern bool g_bCacheLegacyFlashlightStatus;
 
 BEGIN_DATADESC( CHalfLife2Proxy )
 
@@ -121,7 +121,7 @@ bool CHalfLife2Proxy::KeyValue( const char *szKeyName, const char *szValue )
 		g_bUseLegacyFlashlight = !FStrEq(szValue, "0");
 
 		// We have overridden it, don't test directory
-		g_bCacheLegacyFlashlightStatus = false;
+		//g_bCacheLegacyFlashlightStatus = false;
 
 		// Tell our save/load we've modified it
 		// 1 = modified, 2 = legacy enabled
@@ -228,7 +228,7 @@ int CHalfLife2Proxy::Restore( IRestore &restore )
 		g_bUseLegacyFlashlight = (m_save_LegacyFlashlight & 2) != 0;
 
 		// If we've got the desired legacy flashlight state saved, don't bother caching.
-		g_bCacheLegacyFlashlightStatus = false;
+		//g_bCacheLegacyFlashlightStatus = false;
 	}
 
 	HL2GameRules()->SetStunstickPickupBehavior(m_save_StunstickPickupBehavior);
@@ -247,7 +247,7 @@ void CHalfLife2Proxy::UpdateOnRemove()
 	if (m_save_LegacyFlashlight & 1)
 	{
 		// Restore the default state.
-		g_bCacheLegacyFlashlightStatus = true;
+		//g_bCacheLegacyFlashlightStatus = true;
 	}
 
 	BaseClass::UpdateOnRemove();

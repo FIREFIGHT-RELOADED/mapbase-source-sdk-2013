@@ -37,12 +37,12 @@ public:
 	bool				IsSprintActive( void ) { return m_HL2Local.m_bitsActiveDevices & bits_SUIT_DEVICE_SPRINT; }
 	bool				IsFlashlightActive( void ) { return m_HL2Local.m_bitsActiveDevices & bits_SUIT_DEVICE_FLASHLIGHT; }
 	bool				IsBreatherActive( void ) { return m_HL2Local.m_bitsActiveDevices & bits_SUIT_DEVICE_BREATHER; }
-
+	bool				IsInBullettime(void) { return m_HL2Local.m_bitsActiveDevices & bits_SUIT_DEVICE_BULLETTIME; }
 	//device0 is bullettime
 #ifdef MAPBASE
-	bool				IsCustomDevice0Active( void ) { return m_HL2Local.m_bitsActiveDevices & bits_SUIT_DEVICE_CUSTOM0; }
-	bool				IsCustomDevice1Active( void ) { return m_HL2Local.m_bitsActiveDevices & bits_SUIT_DEVICE_CUSTOM1; }
-	bool				IsCustomDevice2Active( void ) { return m_HL2Local.m_bitsActiveDevices & bits_SUIT_DEVICE_CUSTOM2; }
+	bool				IsCustomDevice0Active(void) { return m_HL2Local.m_bitsActiveDevices & bits_SUIT_DEVICE_CUSTOM0; }
+	bool				IsCustomDevice1Active(void) { return m_HL2Local.m_bitsActiveDevices & bits_SUIT_DEVICE_CUSTOM1; }
+	bool				IsCustomDevice2Active(void) { return m_HL2Local.m_bitsActiveDevices & bits_SUIT_DEVICE_CUSTOM2; }
 #endif
 
 	virtual int			DrawModel( int flags );
@@ -67,9 +67,6 @@ public:
 	virtual void DoImpactEffect(trace_t &tr, int nDamageType);
 	virtual bool ShouldReceiveProjectedTextures(int flags);
 
-	CSinglePlayerAnimState *m_pPlayerAnimState;
-	QAngle m_angEyeAngles;
-
 public:
 
 	C_HL2PlayerLocalData		m_HL2Local;
@@ -90,6 +87,7 @@ private:
 	bool				m_bPlayUseDenySound;		// Signaled by PlayerUse, but can be unset by HL2 ladder code...
 	float				m_flSpeedMod;
 	float				m_flExitSpeedMod;
+	EHANDLE	m_hRagdoll;
 
 
 friend class CHL2GameMovement;

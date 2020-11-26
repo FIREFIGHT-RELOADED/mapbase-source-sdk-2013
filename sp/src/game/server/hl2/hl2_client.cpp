@@ -159,12 +159,13 @@ void ClientGamePrecache( void )
 // called by ClientKill and DeadThink
 void respawn( CBaseEntity *pEdict, bool fCopyCorpse )
 {
+	CBasePlayer* pPlayer = (CBasePlayer*)pEdict;
 	if (gpGlobals->coop || gpGlobals->deathmatch)
 	{
 		if ( fCopyCorpse )
 		{
 			// make a copy of the dead body for appearances sake
-			((CHL2_Player *)pEdict)->CreateCorpse();
+			pPlayer->CreateCorpse();
 		}
 
 		// respawn player
@@ -181,7 +182,6 @@ void respawn( CBaseEntity *pEdict, bool fCopyCorpse )
 	else if (g_pGameRules->AllowSPRespawn())
 	{
 		// In SP respawns, only create corpse if drawing externally
-		CBasePlayer *pPlayer = (CBasePlayer*)pEdict;
 		if ( fCopyCorpse && pPlayer->m_bDrawPlayerModelExternally )
 		{
 			// make a copy of the dead body for appearances sake

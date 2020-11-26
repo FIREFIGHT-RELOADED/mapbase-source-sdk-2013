@@ -1459,10 +1459,10 @@ void CProtoSniper::Event_Killed( const CTakeDamageInfo &info )
 		CBaseEntity *pGib;
 #ifdef MAPBASE
 		bool bShouldIgnite = IsOnFire() || HasSpawnFlags(SF_SNIPER_DIE_ON_FIRE);
-		pGib = CreateRagGib( STRING(GetModelName()), GetAbsOrigin(), GetAbsAngles(), vecForce, flFadeTime, bShouldIgnite );
+		pGib = CreateRagGib( this, STRING(GetModelName()), GetAbsOrigin(), GetAbsAngles(), vecForce, flFadeTime, bShouldIgnite );
 #else
 		bool bShouldIgnite = IsOnFire() || hl2_episodic.GetBool();
-		pGib = CreateRagGib( "models/combine_soldier.mdl", GetLocalOrigin(), GetLocalAngles(), (vecForward * flForce) + Vector(0, 0, 600), flFadeTime, bShouldIgnite );
+		pGib = CreateRagGib( this, "models/combine_soldier.mdl", GetLocalOrigin(), GetLocalAngles(), (vecForward * flForce) + Vector(0, 0, 600), flFadeTime, bShouldIgnite );
 #endif
 
 	}
