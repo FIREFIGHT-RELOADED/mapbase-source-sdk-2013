@@ -10,6 +10,7 @@
 #pragma once
 
 
+#include "firefightreloaded/singleplayer_animstate.h"
 #include "player.h"
 #include "hl2_playerlocaldata.h"
 #include "simtimer.h"
@@ -128,14 +129,18 @@ public:
 	virtual void		Splash( void );
 	virtual void 		ModifyOrAppendPlayerCriteria( AI_CriteriaSet& set );
 
-#ifdef MAPBASE
+#ifdef MAPBASE_HLDM_ANIMS //MAPBASE
 	// For the logic_playerproxy output
 	void				SpawnedAtPoint( CBaseEntity *pSpawnPoint );
 
 	void				ResetAnimation( void );
 	void				SetAnimation( PLAYER_ANIM playerAnim );
+#else
+	void				SetAnimation( PLAYER_ANIM playerAnim );
+#endif
 
-	virtual const char *GetOverrideStepSound( const char *pszBaseStepSoundName );
+#ifdef MAPBASE
+	virtual const char* GetOverrideStepSound(const char* pszBaseStepSoundName);
 #endif
 
 	void				DrawDebugGeometryOverlays(void);
@@ -386,8 +391,6 @@ public:
 	CSoundPatch *m_sndLeeches;
 	CSoundPatch *m_sndWaterSplashes;
 
-	//void SetAnimation(PLAYER_ANIM playerAnim);
-
 	// Tracks our ragdoll entity.
 	CNetworkHandle(CBaseEntity, m_hRagdoll);	// networked entity handle 
 
@@ -445,6 +448,7 @@ private:
 	float				m_flNextFlashlightCheckTime;
 	float				m_flFlashlightPowerDrainScale;
 
+
 	// Aiming heuristics code
 	float				m_flIdleTime;		//Amount of time we've been motionless
 	float				m_flMoveTime;		//Amount of time we've been in motion
@@ -471,6 +475,9 @@ private:
 	float				m_flTimeNextLadderHint;	// Next time we're eligible to display a HUD hint about a ladder.
 	
 	friend class CHL2GameMovement;
+
+	CSinglePlayerAnimState *m_pPlayerAnimState;
+	QAngle m_angEyeAngles;
 };
 
 

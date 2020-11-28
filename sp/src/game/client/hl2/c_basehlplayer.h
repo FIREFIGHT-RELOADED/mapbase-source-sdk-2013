@@ -14,6 +14,7 @@
 
 #include "c_baseplayer.h"
 #include "c_hl2_playerlocaldata.h"
+#include "firefightreloaded/singleplayer_animstate.h"
 
 class C_BaseHLPlayer : public C_BasePlayer
 {
@@ -67,6 +68,9 @@ public:
 	virtual void DoImpactEffect(trace_t &tr, int nDamageType);
 	virtual bool ShouldReceiveProjectedTextures(int flags);
 
+	CSinglePlayerAnimState *m_pPlayerAnimState;
+	QAngle m_angEyeAngles;
+
 public:
 
 	C_HL2PlayerLocalData		m_HL2Local;
@@ -92,6 +96,4 @@ private:
 
 friend class CHL2GameMovement;
 };
-
-
 #endif
